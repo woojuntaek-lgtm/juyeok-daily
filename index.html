@@ -1,0 +1,410 @@
+<!DOCTYPE html>
+<!--
+  오늘의 주역 한 괘 / Daily I Ching
+  Copyright (c) 2026 정필 수심명
+  - 코드(HTML/CSS/JS 로직): MIT License
+  - 괘 풀이·효사 풀이 문구와 데이터(DATA, YAO 상수): CC BY-NC 4.0
+    https://creativecommons.org/licenses/by-nc/4.0/deed.ko
+  - 주역 한문 원문은 공유저작물(퍼블릭 도메인)입니다.
+  자세한 내용은 저장소의 LICENSE, LICENSE-CONTENT.md, README.md 참고
+-->
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#14110f">
+<meta name="description" content="주역 64괘로 하루 한 괘를 뽑아 보는 성찰용 도구. 날짜·매화역수·동전 던지기 방식을 지원합니다.">
+<title>오늘의 주역 한 괘</title>
+<style>
+:root{
+  --bg:#14110f; --bg2:#1d1814; --paper:#f3ead8; --ink:#2a211a; --gold:#c9a24d; --gold2:#e6c878;
+  --muted:#a89a85; --line:#3a3128; --red:#a8432f;
+}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;background:radial-gradient(1200px 700px at 50% -10%,#2a2119 0%,var(--bg) 60%) fixed;color:var(--paper);
+  font-family:"Noto Sans KR","Malgun Gothic","Apple SD Gothic Neo",system-ui,sans-serif;line-height:1.6}
+.wrap{max-width:480px;margin:0 auto;padding:max(18px,env(safe-area-inset-top)) 16px 40px}
+header{text-align:center;padding:6px 0 14px}
+header .date{color:var(--muted);font-size:14px;letter-spacing:.04em}
+header h1{margin:4px 0 0;font-size:20px;font-weight:700;color:var(--gold2);letter-spacing:.08em}
+
+/* 닫힌 카드 */
+.deck{display:block;width:100%;border:0;background:none;padding:0;cursor:pointer;color:inherit;font:inherit}
+.back{position:relative;margin:10px auto 0;width:min(78vw,300px);aspect-ratio:3/5;border-radius:16px;
+  background:linear-gradient(160deg,#2b2118,#1a1410);border:1px solid var(--gold);
+  box-shadow:0 18px 40px rgba(0,0,0,.55), inset 0 0 0 6px #1a1410, inset 0 0 0 7px rgba(201,162,77,.5);
+  display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px}
+.back .tai{font-size:92px;line-height:1;color:var(--gold);opacity:.9;font-family:"Noto Serif KR","Batang",serif}
+.back .hint{font-size:15px;color:var(--gold2)}
+.back .sub{font-size:12px;color:var(--muted)}
+.shake{animation:shake .9s ease-in-out}
+@keyframes shake{0%,100%{transform:rotate(0)}15%{transform:rotate(-5deg) translateY(-4px)}30%{transform:rotate(5deg)}45%{transform:rotate(-4deg) translateY(-3px)}60%{transform:rotate(4deg)}80%{transform:rotate(-2deg)}}
+
+/* 열린 카드 */
+.card{margin:6px auto 0;background:var(--paper);color:var(--ink);border-radius:18px;padding:22px 20px 22px;
+  box-shadow:0 18px 40px rgba(0,0,0,.5);animation:rise .6s ease both;position:relative}
+@keyframes rise{from{opacity:0;transform:translateY(14px) scale(.98)}to{opacity:1;transform:none}}
+.card::before{content:"";position:absolute;inset:7px;border:1px solid rgba(42,33,26,.25);border-radius:12px;pointer-events:none}
+.top{display:flex;align-items:center;gap:16px}
+.hex{display:flex;flex-direction:column;gap:7px;width:104px;flex:none}
+.hex .grp{display:flex;flex-direction:column;gap:6px}
+.hex .grp+.grp{margin-top:3px}
+.yao{height:9px;display:flex;justify-content:space-between}
+.yao i{display:block;height:100%;background:var(--ink);border-radius:2px}
+.yao.yang i{width:100%}
+.yao.yin i{width:43%}
+.names{min-width:0}
+.num{font-size:12px;color:#7a6a58;letter-spacing:.1em}
+.hanja{font-family:"Noto Serif KR","Batang","Songti SC",serif;font-size:58px;line-height:1.05;font-weight:700;margin:0}
+.kname{font-size:19px;font-weight:700;margin-top:2px}
+.trig{margin:16px 0 4px;display:flex;gap:8px;font-size:13px}
+.trig span{flex:1;background:rgba(42,33,26,.07);border-radius:10px;padding:7px 10px;text-align:center}
+.trig b{font-family:"Noto Serif KR",serif;font-size:16px;margin-right:4px}
+.core{margin:16px 0 4px;padding:14px 14px;background:var(--ink);color:var(--gold2);border-radius:12px;font-size:18px;font-weight:700;line-height:1.5;text-align:center;word-break:keep-all}
+.sec{margin-top:16px}
+.sec h3{margin:0 0 4px;font-size:12px;letter-spacing:.14em;color:var(--red);font-weight:700}
+.sec p{margin:0;font-size:16.5px;word-break:keep-all}
+.actions{display:flex;gap:10px;margin-top:20px}
+.btn{flex:1;border:1px solid var(--gold);background:transparent;color:var(--gold2);padding:12px 8px;border-radius:12px;font:inherit;font-size:14px;cursor:pointer}
+.btn:active{background:rgba(201,162,77,.15)}
+.card .btn{border-color:var(--ink);color:var(--ink)}
+.card .btn:active{background:rgba(42,33,26,.1)}
+
+.hist{margin-top:26px}
+.hist h2{font-size:13px;color:var(--muted);font-weight:500;letter-spacing:.1em;margin:0 0 8px}
+.hist ul{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:6px}
+.hist li button{width:100%;display:flex;align-items:center;gap:12px;text-align:left;background:var(--bg2);border:1px solid var(--line);
+  color:var(--paper);border-radius:12px;padding:10px 14px;font:inherit;cursor:pointer}
+.hist .d{font-size:12px;color:var(--muted);width:64px;flex:none}
+.hist .h{font-family:"Noto Serif KR",serif;font-size:20px;color:var(--gold2);width:34px;flex:none;text-align:center}
+.hist .n{font-size:14px}
+.foot{margin-top:22px;text-align:center;font-size:11.5px;color:#6f6455}
+.viewing{margin:0 0 8px;text-align:center;font-size:13px;color:var(--gold2)}
+.viewing a{color:var(--paper);text-decoration:underline;cursor:pointer;margin-left:6px}
+.toast{position:fixed;left:50%;bottom:28px;transform:translateX(-50%);background:#000c;color:#fff;padding:9px 16px;border-radius:20px;font-size:13px;opacity:0;transition:.3s;pointer-events:none}
+.toast.on{opacity:1}
+@media (prefers-reduced-motion:reduce){.shake,.card{animation:none}}
+
+.modes{display:flex;gap:6px;margin:12px 0 0;background:var(--bg2);border:1px solid var(--line);border-radius:14px;padding:4px}
+.modes button{flex:1;border:0;background:transparent;color:var(--muted);padding:9px 4px;border-radius:10px;font:inherit;font-size:13.5px;cursor:pointer}
+.modes button[aria-pressed="true"]{background:var(--gold);color:#1a1410;font-weight:700}
+.mdesc{margin:8px 4px 0;font-size:12.5px;color:var(--muted);text-align:center;word-break:keep-all}
+.pbox{margin:10px 0 0;display:flex;gap:8px}
+.pbox input{flex:1;min-width:0;background:var(--bg2);border:1px solid var(--line);color:var(--paper);border-radius:10px;padding:10px 12px;font:inherit;font-size:14px}
+.pbox input::placeholder{color:#7b6f60}
+.pbox[hidden]{display:none}
+.basis{margin-top:14px;font-size:12.5px;color:#6b5b49;text-align:center;word-break:keep-all}
+.need{margin:18px auto 0;padding:26px 18px;text-align:center;color:var(--gold2);background:var(--bg2);border:1px dashed var(--gold);border-radius:16px;font-size:15px;word-break:keep-all}
+.yao.mv i{background:var(--red)}
+.modes button{font-size:13px!important}
+
+.modes{flex-wrap:wrap}
+.modes button{flex:1 1 30%!important}
+.yi{padding:10px 2px;border-top:1px solid rgba(42,33,26,.15)}
+.yi.hl{background:rgba(168,67,47,.09);border-radius:10px;padding:10px;border-top-color:transparent;margin-top:4px}
+.yi b{font-size:13px;color:var(--red)}
+.yi .ho{font-family:"Noto Serif KR","Batang",serif;font-size:15px;margin-left:8px;font-weight:700}
+.yi p{margin:3px 0 0;font-size:15px;word-break:keep-all}
+details.all{margin-top:18px}
+details.all summary{cursor:pointer;font-size:14px;color:var(--ink);padding:10px 0;font-weight:700}
+.tray{margin:6px auto 0;background:var(--paper);color:var(--ink);border-radius:18px;padding:22px 20px;box-shadow:0 18px 40px rgba(0,0,0,.5);text-align:center}
+.tray .tq{font-size:15px;color:#5a4a3a;margin-bottom:14px}
+.slots{display:flex;flex-direction:column;gap:9px;margin:0 auto 16px;max-width:300px}
+.slot{display:flex;align-items:center;gap:10px}
+.slot .sl{width:34px;font-size:12px;color:#7a6a58;text-align:left}
+.slot .yao{flex:1}
+.slot .sv{width:62px;font-size:12px;color:#5a4a3a;text-align:right}
+.coins{display:flex;justify-content:center;gap:14px;margin:6px 0 16px}
+.coin{width:58px;height:58px;border-radius:50%;background:radial-gradient(circle at 35% 30%,#f3d98a,#b88a2e);border:3px solid #8a6520;
+  display:flex;align-items:center;justify-content:center;font-weight:700;color:#4a3410;font-size:18px;box-shadow:0 3px 6px rgba(0,0,0,.3)}
+.coin.tails{background:radial-gradient(circle at 35% 30%,#d9d2c2,#8d8678);border-color:#6a6559;color:#2a261f}
+.coin.spin{animation:flip .65s ease-in-out}
+@keyframes flip{0%{transform:rotateY(0) translateY(0)}50%{transform:rotateY(900deg) translateY(-26px)}100%{transform:rotateY(1800deg) translateY(0)}}
+.btn.gold{background:var(--ink);color:var(--gold2);border-color:var(--ink);width:100%;padding:14px;font-size:16px;font-weight:700}
+.btn:disabled{opacity:.5}
+
+.notice{margin-top:22px;background:var(--bg2);border:1px solid var(--line);border-radius:14px;padding:4px 14px;font-size:12.5px;color:var(--muted)}
+.notice summary{cursor:pointer;padding:10px 0;color:var(--gold2);font-size:13px}
+.notice p{margin:0 0 10px;word-break:keep-all;line-height:1.65}
+.notice b{color:var(--paper)}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div class="date" id="date"></div>
+    <h1>오늘의 주역 한 괘</h1>
+    <nav class="modes" id="modes"></nav>
+    <div class="mdesc" id="mdesc"></div>
+    <div class="pbox" id="pbox" hidden>
+      <input id="pname" placeholder="이름 (또는 별칭)" autocomplete="off">
+      <input id="pbirth" type="date" aria-label="생년월일">
+    </div>
+  </header>
+  <main id="stage"></main>
+  <section class="hist" id="hist" hidden>
+    <h2>지난 괘</h2>
+    <ul id="histList"></ul>
+  </section>
+  <details class="notice">
+    <summary>이용 안내 · 면책 · 라이선스</summary>
+    <p><b>성찰·오락용 도구입니다.</b> 주역의 괘와 효사를 바탕으로 스스로를 돌아보도록 돕는 참고 자료이며, 미래를 예언하거나 결과를 보장하지 않습니다. 의료·법률·투자·심리 진단이나 전문 상담을 대신하지 않으니, 중요한 결정은 해당 분야 전문가와 상의하세요.</p>
+    <p>마음이 많이 힘들거나 위기를 느끼신다면 혼자 견디지 마시고 가까운 사람이나 전문 기관(자살예방상담전화 109, 정신건강위기상담전화 1577-0199)에 도움을 요청하세요.</p>
+    <p><b>개인정보:</b> 입력한 이름·생년월일과 뽑은 기록은 이 기기의 브라우저에만 저장되며 외부로 전송되지 않습니다. 브라우저 데이터를 지우면 함께 삭제됩니다.</p>
+    <p><b>라이선스:</b> 프로그램 코드는 MIT, 괘·효사 풀이 문구와 데이터는 CC BY-NC 4.0(출처를 밝히면 비영리 목적으로 자유 이용)입니다. 주역 한문 원문은 공유저작물입니다. © 2026 정필 수심명. 이 앱은 있는 그대로 제공되며 이용으로 인한 결과에 대해 보증하지 않습니다.</p>
+  </details>
+  <div class="foot">64괘 · 선택한 방식에 따라 하루 한 괘가 정해집니다 · 기록은 이 기기에만 저장됩니다</div>
+</div>
+<div class="toast" id="toast"></div>
+
+<script>
+const DATA = [{"number": 1, "hanja": "乾", "korean_name": "중천건", "upper_trigram": {"key": "건", "hanja": "乾", "meaning": "하늘"}, "lower_trigram": {"key": "건", "hanja": "乾", "meaning": "하늘"}, "line_pattern_bottom_to_top": "111111", "core_meaning": "쉼 없이 스스로 굳세게 나아가는 힘", "reflection_question": "지금 내가 멈추지 않고 밀고 나가야 할 일은 무엇인가?", "practical_advice": "오늘 하루, 미루던 일 하나를 망설이지 말고 시작해보자."}, {"number": 2, "hanja": "坤", "korean_name": "중지곤", "upper_trigram": {"key": "곤", "hanja": "坤", "meaning": "땅"}, "lower_trigram": {"key": "곤", "hanja": "坤", "meaning": "땅"}, "line_pattern_bottom_to_top": "000000", "core_meaning": "유순하게 받아들이고 두텁게 품는 힘", "reflection_question": "지금 내가 버티기보다 받아들여야 할 것은 무엇인가?", "practical_advice": "오늘은 내 뜻을 앞세우기보다 상대의 말을 끝까지 들어보자."}, {"number": 3, "hanja": "屯", "korean_name": "수뢰준", "upper_trigram": {"key": "감", "hanja": "坎", "meaning": "물"}, "lower_trigram": {"key": "진", "hanja": "震", "meaning": "우레"}, "line_pattern_bottom_to_top": "100010", "core_meaning": "시작의 어려움, 처음이라 서투르고 막막함", "reflection_question": "지금의 막막함은 아직 서툴러서인가, 방향이 틀려서인가?", "practical_advice": "서툴러도 괜찮으니 오늘은 작은 한 걸음만 내디뎌보자."}, {"number": 4, "hanja": "蒙", "korean_name": "산수몽", "upper_trigram": {"key": "간", "hanja": "艮", "meaning": "산"}, "lower_trigram": {"key": "감", "hanja": "坎", "meaning": "물"}, "line_pattern_bottom_to_top": "010001", "core_meaning": "어리고 어두워 배움이 필요한 때", "reflection_question": "지금 내가 인정하지 못하고 있는 모르는 부분은 무엇인가?", "practical_advice": "모른다는 것을 인정하고 오늘 하나라도 배워보자."}, {"number": 5, "hanja": "需", "korean_name": "수천수", "upper_trigram": {"key": "감", "hanja": "坎", "meaning": "물"}, "lower_trigram": {"key": "건", "hanja": "乾", "meaning": "하늘"}, "line_pattern_bottom_to_top": "111010", "core_meaning": "때를 기다리며 힘을 기름", "reflection_question": "지금은 움직일 때인가, 기다릴 때인가?", "practical_advice": "조급해하지 말고 오늘은 준비에만 집중해보자."}, {"number": 6, "hanja": "訟", "korean_name": "천수송", "upper_trigram": {"key": "건", "hanja": "乾", "meaning": "하늘"}, "lower_trigram": {"key": "감", "hanja": "坎", "meaning": "물"}, "line_pattern_bottom_to_top": "010111", "core_meaning": "다툼과 어긋남, 무리하게 밀어붙이면 흉함", "reflection_question": "이 다툼에서 내가 물러설 지점은 어디인가?", "practical_advice": "오늘은 시비를 가리기보다 한 걸음 물러나 보자."}, {"number": 7, "hanja": "師", "korean_name": "지수사", "upper_trigram": {"key": "곤", "hanja": "坤", "meaning": "땅"}, "lower_trigram": {"key": "감", "hanja": "坎", "meaning": "물"}, "line_pattern_bottom_to_top": "010000", "core_meaning": "무리를 이끌 때는 규율과 명분이 우선", "reflection_question": "지금 이 일을 이끄는 원칙이 분명한가?", "practical_advice": "오늘 할 일에 분명한 원칙을 하나 세워두자."}, {"number": 8, "hanja": "比", "korean_name": "수지비", "upper_trigram": {"key": "감", "hanja": "坎", "meaning": "물"}, "lower_trigram": {"key": "곤", "hanja": "坤", "meaning": "땅"}, "line_pattern_bottom_to_top": "000010", "core_meaning": "가까이 협력하고 친애함", "reflection_question": "지금 내가 더 가까이 손을 내밀어야 할 사람은 누구인가?", "practical_advice": "오늘은 혼자 애쓰지 말고 곁의 사람에게 먼저 다가가 보자."}, {"number": 9, "hanja": "小畜", "korean_name": "풍천소축", "upper_trigram": {"key": "손", "hanja": "巽", "meaning": "바람"}, "lower_trigram": {"key": "건", "hanja": "乾", "meaning": "하늘"}, "line_pattern_bottom_to_top": "111011", "core_meaning": "작게 저축하며 힘을 모으는 중, 아직은 크게 못 씀", "reflection_question": "지금은 크게 쓰기보다 조금씩 쌓을 때가 아닌가?", "practical_advice": "오늘은 크게 벌이기보다 작은 것부터 차곡차곡 모아보자."}, {"number": 10, "hanja": "履", "korean_name": "천택리", "upper_trigram": {"key": "건", "hanja": "乾", "meaning": "하늘"}, "lower_trigram": {"key": "태", "hanja": "兌", "meaning": "못"}, "line_pattern_bottom_to_top": "110111", "core_meaning": "위태로운 자리를 조심스레 밟아 나감", "reflection_question": "지금 내가 더 조심스럽게 디뎌야 할 걸음은?", "practical_advice": "오늘은 서두르지 말고 한 걸음씩 조심스레 확인하며 가자."}, {"number": 11, "hanja": "泰", "korean_name": "지천태", "upper_trigram": {"key": "곤", "hanja": "坤", "meaning": "땅"}, "lower_trigram": {"key": "건", "hanja": "乾", "meaning": "하늘"}, "line_pattern_bottom_to_top": "111000", "core_meaning": "하늘과 땅이 통하는 태평함, 형통함", "reflection_question": "지금 잘 풀리는 이 흐름을 어떻게 지킬 것인가?", "practical_advice": "지금의 순조로움에 감사하며 나누는 하루를 보내보자."}, {"number": 12, "hanja": "否", "korean_name": "천지비", "upper_trigram": {"key": "건", "hanja": "乾", "meaning": "하늘"}, "lower_trigram": {"key": "곤", "hanja": "坤", "meaning": "땅"}, "line_pattern_bottom_to_top": "000111", "core_meaning": "위아래가 통하지 않는 막힘의 때", "reflection_question": "지금 막혀 있다면, 무리해서 뚫기보다 물러설 때는 아닌가?", "practical_advice": "오늘 잘 안 풀린다면 억지로 밀어붙이지 말고 잠시 멈춰보자."}, {"number": 13, "hanja": "同人", "korean_name": "천화동인", "upper_trigram": {"key": "건", "hanja": "乾", "meaning": "하늘"}, "lower_trigram": {"key": "리", "hanja": "離", "meaning": "불"}, "line_pattern_bottom_to_top": "101111", "core_meaning": "뜻을 같이하는 사람들과 함께함", "reflection_question": "지금 같은 뜻으로 함께할 사람은 누구인가?", "practical_advice": "오늘은 같은 뜻을 가진 사람과 마음을 나눠보자."}, {"number": 14, "hanja": "大有", "korean_name": "화천대유", "upper_trigram": {"key": "리", "hanja": "離", "meaning": "불"}, "lower_trigram": {"key": "건", "hanja": "乾", "meaning": "하늘"}, "line_pattern_bottom_to_top": "111101", "core_meaning": "크게 가짐, 풍성하되 겸손해야 함", "reflection_question": "지금 가진 것을 어떻게 나누며 지킬 것인가?", "practical_advice": "가진 것이 많을수록 오늘은 더 겸손하게 나눠보자."}, {"number": 15, "hanja": "謙", "korean_name": "지산겸", "upper_trigram": {"key": "곤", "hanja": "坤", "meaning": "땅"}, "lower_trigram": {"key": "간", "hanja": "艮", "meaning": "산"}, "line_pattern_bottom_to_top": "001000", "core_meaning": "겸손함, 가득해도 낮추면 오래감", "reflection_question": "지금 내가 낮춰야 할 자만은 무엇인가?", "practical_advice": "잘된 일이 있어도 오늘은 자랑보다 낮춤을 택해보자."}, {"number": 16, "hanja": "豫", "korean_name": "뇌지예", "upper_trigram": {"key": "진", "hanja": "震", "meaning": "우레"}, "lower_trigram": {"key": "곤", "hanja": "坤", "meaning": "땅"}, "line_pattern_bottom_to_top": "000100", "core_meaning": "미리 대비하고 즐거이 움직임", "reflection_question": "지금 즐거움에 취해 대비를 소홀히 한 건 없는가?", "practical_advice": "오늘은 미리 준비해두고 마음 편히 움직여보자."}, {"number": 17, "hanja": "隨", "korean_name": "택뢰수", "upper_trigram": {"key": "태", "hanja": "兌", "meaning": "못"}, "lower_trigram": {"key": "진", "hanja": "震", "meaning": "우레"}, "line_pattern_bottom_to_top": "100110", "core_meaning": "때와 사람을 따름, 유연하게 좇음", "reflection_question": "지금 내가 고집을 버리고 따라야 할 흐름은?", "practical_advice": "오늘은 고집부리지 말고 흐름에 맞춰 유연하게 움직여보자."}, {"number": 18, "hanja": "蠱", "korean_name": "산풍고", "upper_trigram": {"key": "간", "hanja": "艮", "meaning": "산"}, "lower_trigram": {"key": "손", "hanja": "巽", "meaning": "바람"}, "line_pattern_bottom_to_top": "011001", "core_meaning": "오래 방치되어 곪은 일을 바로잡음", "reflection_question": "지금 손대지 않고 미뤄둔 문제는 무엇인가?", "practical_advice": "미뤄둔 문제 하나를 오늘 꺼내어 바로잡아보자."}, {"number": 19, "hanja": "臨", "korean_name": "지택림", "upper_trigram": {"key": "곤", "hanja": "坤", "meaning": "땅"}, "lower_trigram": {"key": "태", "hanja": "兌", "meaning": "못"}, "line_pattern_bottom_to_top": "110000", "core_meaning": "위에서 아래로 가까이 다가가 살핌", "reflection_question": "지금 내가 더 가까이 다가가 살펴야 할 사람/일은?", "practical_advice": "오늘은 가까운 사람의 상태를 한번 살펴보자."}, {"number": 20, "hanja": "觀", "korean_name": "풍지관", "upper_trigram": {"key": "손", "hanja": "巽", "meaning": "바람"}, "lower_trigram": {"key": "곤", "hanja": "坤", "meaning": "땅"}, "line_pattern_bottom_to_top": "000011", "core_meaning": "멀리서 차분히 살펴봄, 본보기가 됨", "reflection_question": "지금 내가 서둘러 판단하지 말고 지켜봐야 할 것은?", "practical_advice": "오늘은 바로 판단하지 말고 한발 물러나 지켜보자."}, {"number": 21, "hanja": "噬嗑", "korean_name": "화뢰서합", "upper_trigram": {"key": "리", "hanja": "離", "meaning": "불"}, "lower_trigram": {"key": "진", "hanja": "震", "meaning": "우레"}, "line_pattern_bottom_to_top": "100101", "core_meaning": "가로막는 것을 씹어 깨물어 뚫음", "reflection_question": "지금 단호하게 처리해야 할 장애물은 무엇인가?", "practical_advice": "가로막힌 문제가 있다면 오늘 정면으로 부딪쳐 풀어보자."}, {"number": 22, "hanja": "賁", "korean_name": "산화비", "upper_trigram": {"key": "간", "hanja": "艮", "meaning": "산"}, "lower_trigram": {"key": "리", "hanja": "離", "meaning": "불"}, "line_pattern_bottom_to_top": "101001", "core_meaning": "꾸밈, 겉을 다듬되 본질을 잃지 않음", "reflection_question": "지금 내가 꾸미는 것이 본질을 가리고 있진 않은가?", "practical_advice": "오늘 겉모습을 다듬더라도 본질은 잊지 말자."}, {"number": 23, "hanja": "剝", "korean_name": "산지박", "upper_trigram": {"key": "간", "hanja": "艮", "meaning": "산"}, "lower_trigram": {"key": "곤", "hanja": "坤", "meaning": "땅"}, "line_pattern_bottom_to_top": "000001", "core_meaning": "깎여 나감, 쇠퇴의 흐름, 함부로 움직이지 말 것", "reflection_question": "지금 버티기보다 담담히 받아들여야 할 쇠퇴는?", "practical_advice": "상황이 나쁘다고 느껴지면 오늘은 무리하지 말고 몸을 낮추자."}, {"number": 24, "hanja": "復", "korean_name": "지뢰복", "upper_trigram": {"key": "곤", "hanja": "坤", "meaning": "땅"}, "lower_trigram": {"key": "진", "hanja": "震", "meaning": "우레"}, "line_pattern_bottom_to_top": "100000", "core_meaning": "밑바닥에서 다시 돌아옴, 회복의 시작", "reflection_question": "지금 내가 다시 회복하기 시작한 것은 무엇인가?", "practical_advice": "작더라도 오늘 다시 시작하는 것 자체에 의미를 두자."}, {"number": 25, "hanja": "无妄", "korean_name": "천뢰무망", "upper_trigram": {"key": "건", "hanja": "乾", "meaning": "하늘"}, "lower_trigram": {"key": "진", "hanja": "震", "meaning": "우레"}, "line_pattern_bottom_to_top": "100111", "core_meaning": "망령됨 없이 자연스럽고 진실하게", "reflection_question": "지금 내가 꾸며낸 기대 없이 있는 그대로 봐야 할 것은?", "practical_advice": "오늘은 꾸미지 말고 있는 그대로 진실하게 행동해보자."}, {"number": 26, "hanja": "大畜", "korean_name": "산천대축", "upper_trigram": {"key": "간", "hanja": "艮", "meaning": "산"}, "lower_trigram": {"key": "건", "hanja": "乾", "meaning": "하늘"}, "line_pattern_bottom_to_top": "111001", "core_meaning": "크게 쌓음, 안으로 힘을 축적해 멈춰 있음", "reflection_question": "지금 밖으로 쓰기보다 안으로 쌓아야 할 힘은?", "practical_advice": "오늘은 밖으로 드러내기보다 안으로 실력을 쌓는 데 힘쓰자."}, {"number": 27, "hanja": "頤", "korean_name": "산뢰이", "upper_trigram": {"key": "간", "hanja": "艮", "meaning": "산"}, "lower_trigram": {"key": "진", "hanja": "震", "meaning": "우레"}, "line_pattern_bottom_to_top": "100001", "core_meaning": "기름, 무엇으로 스스로를 채우는가", "reflection_question": "지금 나를 채우고 있는 것이 몸과 마음에 좋은가?", "practical_advice": "오늘 내가 무엇을 먹고 채우고 있는지 한번 돌아보자."}, {"number": 28, "hanja": "大過", "korean_name": "택풍대과", "upper_trigram": {"key": "태", "hanja": "兌", "meaning": "못"}, "lower_trigram": {"key": "손", "hanja": "巽", "meaning": "바람"}, "line_pattern_bottom_to_top": "011110", "core_meaning": "지나침이 큼, 버티기 힘든 과중함", "reflection_question": "지금 내가 감당하기 버거운 짐은 무엇인가?", "practical_advice": "너무 버겁다면 오늘은 짐을 나누거나 잠시 내려놓아보자."}, {"number": 29, "hanja": "坎", "korean_name": "중수감", "upper_trigram": {"key": "감", "hanja": "坎", "meaning": "물"}, "lower_trigram": {"key": "감", "hanja": "坎", "meaning": "물"}, "line_pattern_bottom_to_top": "010010", "core_meaning": "거듭된 험난함, 진심으로 정성을 다해 건너야 함", "reflection_question": "지금 이 어려움 속에서 내가 지켜야 할 진심은?", "practical_advice": "어려움이 반복돼도 오늘은 포기 않고 정성으로 건너보자."}, {"number": 30, "hanja": "離", "korean_name": "중화리", "upper_trigram": {"key": "리", "hanja": "離", "meaning": "불"}, "lower_trigram": {"key": "리", "hanja": "離", "meaning": "불"}, "line_pattern_bottom_to_top": "101101", "core_meaning": "밝게 붙음, 의지할 곳에 붙어 빛남", "reflection_question": "지금 내가 의지하고 있는 것은 나를 밝혀주는가?", "practical_advice": "오늘은 나를 밝혀주는 사람이나 일에 가까이 다가가 보자."}, {"number": 31, "hanja": "咸", "korean_name": "택산함", "upper_trigram": {"key": "태", "hanja": "兌", "meaning": "못"}, "lower_trigram": {"key": "간", "hanja": "艮", "meaning": "산"}, "line_pattern_bottom_to_top": "001110", "core_meaning": "서로 감응함, 마음이 통함", "reflection_question": "지금 말보다 마음으로 통하고 싶은 사람은?", "practical_advice": "오늘은 먼저 마음을 열고 상대에게 다가가 보자."}, {"number": 32, "hanja": "恆", "korean_name": "뇌풍항", "upper_trigram": {"key": "진", "hanja": "震", "meaning": "우레"}, "lower_trigram": {"key": "손", "hanja": "巽", "meaning": "바람"}, "line_pattern_bottom_to_top": "011100", "core_meaning": "오래도록 한결같음", "reflection_question": "지금 내가 오래 지속시켜야 할 꾸준함은 무엇인가?", "practical_advice": "오늘 하던 대로 꾸준히, 흔들리지 말고 이어가 보자."}, {"number": 33, "hanja": "遯", "korean_name": "천산둔", "upper_trigram": {"key": "건", "hanja": "乾", "meaning": "하늘"}, "lower_trigram": {"key": "간", "hanja": "艮", "meaning": "산"}, "line_pattern_bottom_to_top": "001111", "core_meaning": "물러남, 때를 알고 뒤로 빠짐", "reflection_question": "지금 내가 미련 없이 물러나야 할 자리는?", "practical_advice": "무리해서 버티기보다 오늘은 조용히 한 걸음 물러나 보자."}, {"number": 34, "hanja": "大壯", "korean_name": "뇌천대장", "upper_trigram": {"key": "진", "hanja": "震", "meaning": "우레"}, "lower_trigram": {"key": "건", "hanja": "乾", "meaning": "하늘"}, "line_pattern_bottom_to_top": "111100", "core_meaning": "크게 씩씩함, 힘이 강하지만 예를 잃지 말 것", "reflection_question": "지금 내 기세가 지나쳐 예의를 잃고 있진 않은가?", "practical_advice": "힘이 있을수록 오늘은 더 예의를 갖춰 행동하자."}, {"number": 35, "hanja": "晉", "korean_name": "화지진", "upper_trigram": {"key": "리", "hanja": "離", "meaning": "불"}, "lower_trigram": {"key": "곤", "hanja": "坤", "meaning": "땅"}, "line_pattern_bottom_to_top": "000101", "core_meaning": "나아가 해처럼 떠오름, 전진의 때", "reflection_question": "지금 내가 자신 있게 나아가야 할 일은?", "practical_advice": "오늘은 자신 있게 한 걸음 더 앞으로 나아가 보자."}, {"number": 36, "hanja": "明夷", "korean_name": "지화명이", "upper_trigram": {"key": "곤", "hanja": "坤", "meaning": "땅"}, "lower_trigram": {"key": "리", "hanja": "離", "meaning": "불"}, "line_pattern_bottom_to_top": "101000", "core_meaning": "밝음이 상함, 어두운 시절을 견딤", "reflection_question": "지금 드러내기보다 감추고 견뎌야 할 것은?", "practical_advice": "지금이 힘들어도 오늘 하루만은 묵묵히 견뎌보자."}, {"number": 37, "hanja": "家人", "korean_name": "풍화가인", "upper_trigram": {"key": "손", "hanja": "巽", "meaning": "바람"}, "lower_trigram": {"key": "리", "hanja": "離", "meaning": "불"}, "line_pattern_bottom_to_top": "101011", "core_meaning": "집안 사람들, 각자 제자리를 바로 함", "reflection_question": "지금 내가 가까운 사람들과의 관계에서 바로잡을 자리는?", "practical_advice": "오늘은 내 역할과 자리를 한번 점검해보자."}, {"number": 38, "hanja": "睽", "korean_name": "화택규", "upper_trigram": {"key": "리", "hanja": "離", "meaning": "불"}, "lower_trigram": {"key": "태", "hanja": "兌", "meaning": "못"}, "line_pattern_bottom_to_top": "110101", "core_meaning": "어긋남, 서로 등지고 있으나 작은 일은 이룸", "reflection_question": "지금 이 어긋남에서 그래도 통하는 작은 접점은?", "practical_advice": "크게 화해하려 애쓰기보다 오늘은 작은 일부터 맞춰보자."}, {"number": 39, "hanja": "蹇", "korean_name": "수산건", "upper_trigram": {"key": "감", "hanja": "坎", "meaning": "물"}, "lower_trigram": {"key": "간", "hanja": "艮", "meaning": "산"}, "line_pattern_bottom_to_top": "001010", "core_meaning": "다리를 절듯 나아가기 어려움, 돌아가야 할 때", "reflection_question": "지금 정면 돌파보다 돌아가야 할 길은?", "practical_advice": "길이 막혔다면 오늘은 돌아가는 길도 열어두자."}, {"number": 40, "hanja": "解", "korean_name": "뇌수해", "upper_trigram": {"key": "진", "hanja": "震", "meaning": "우레"}, "lower_trigram": {"key": "감", "hanja": "坎", "meaning": "물"}, "line_pattern_bottom_to_top": "010100", "core_meaning": "풀림, 맺힌 것이 풀리기 시작함", "reflection_question": "지금 풀어야 할 오래된 매듭은 무엇인가?", "practical_advice": "오늘은 묵은 오해나 감정을 하나 풀어보자."}, {"number": 41, "hanja": "損", "korean_name": "산택손", "upper_trigram": {"key": "간", "hanja": "艮", "meaning": "산"}, "lower_trigram": {"key": "태", "hanja": "兌", "meaning": "못"}, "line_pattern_bottom_to_top": "110001", "core_meaning": "덜어냄, 아래를 덜어 위를 채우나 진심이면 길함", "reflection_question": "지금 내가 기꺼이 덜어내야 할 것은?", "practical_advice": "오늘은 욕심을 조금 덜어내고 진심을 채워보자."}, {"number": 42, "hanja": "益", "korean_name": "풍뢰익", "upper_trigram": {"key": "손", "hanja": "巽", "meaning": "바람"}, "lower_trigram": {"key": "진", "hanja": "震", "meaning": "우레"}, "line_pattern_bottom_to_top": "100011", "core_meaning": "더함, 위를 덜어 아래를 이롭게 함", "reflection_question": "지금 내가 남을 위해 보태줄 수 있는 것은?", "practical_advice": "오늘은 내가 가진 것을 필요한 사람과 나눠보자."}, {"number": 43, "hanja": "夬", "korean_name": "택천쾌", "upper_trigram": {"key": "태", "hanja": "兌", "meaning": "못"}, "lower_trigram": {"key": "건", "hanja": "乾", "meaning": "하늘"}, "line_pattern_bottom_to_top": "111110", "core_meaning": "결단함, 단호히 끊어내되 무력만은 피할 것", "reflection_question": "지금 단호히 끊어내야 하지만 말은 부드러워야 할 일은?", "practical_advice": "오늘은 미루던 결정을 내리되 부드럽게 매듭짓자."}, {"number": 44, "hanja": "姤", "korean_name": "천풍구", "upper_trigram": {"key": "건", "hanja": "乾", "meaning": "하늘"}, "lower_trigram": {"key": "손", "hanja": "巽", "meaning": "바람"}, "line_pattern_bottom_to_top": "011111", "core_meaning": "우연히 만남, 뜻밖의 마주침을 조심스레 다룸", "reflection_question": "지금 갑자기 찾아온 기회/유혹을 어떻게 대할 것인가?", "practical_advice": "오늘 뜻밖의 제안이나 만남이 있다면 신중히 살펴보자."}, {"number": 45, "hanja": "萃", "korean_name": "택지췌", "upper_trigram": {"key": "태", "hanja": "兌", "meaning": "못"}, "lower_trigram": {"key": "곤", "hanja": "坤", "meaning": "땅"}, "line_pattern_bottom_to_top": "000110", "core_meaning": "모임, 사람과 뜻이 한데 모임", "reflection_question": "지금 내가 사람들을 모아야 할 일은 무엇인가?", "practical_advice": "오늘은 사람들과 뜻을 모으는 자리를 만들어보자."}, {"number": 46, "hanja": "升", "korean_name": "지풍승", "upper_trigram": {"key": "곤", "hanja": "坤", "meaning": "땅"}, "lower_trigram": {"key": "손", "hanja": "巽", "meaning": "바람"}, "line_pattern_bottom_to_top": "011000", "core_meaning": "위로 오름, 순리대로 차츰 나아감", "reflection_question": "지금 서두르지 않고 차근차근 올라가야 할 일은?", "practical_advice": "오늘은 서두르지 말고 순서대로 차근차근 올라가 보자."}, {"number": 47, "hanja": "困", "korean_name": "택수곤", "upper_trigram": {"key": "태", "hanja": "兌", "meaning": "못"}, "lower_trigram": {"key": "감", "hanja": "坎", "meaning": "물"}, "line_pattern_bottom_to_top": "010110", "core_meaning": "곤궁함, 힘들어도 뜻을 굽히지 않음", "reflection_question": "지금의 곤란 속에서도 지켜야 할 내 뜻은?", "practical_advice": "지금 힘들어도 오늘 하루만은 뜻을 굽히지 말자."}, {"number": 48, "hanja": "井", "korean_name": "수풍정", "upper_trigram": {"key": "감", "hanja": "坎", "meaning": "물"}, "lower_trigram": {"key": "손", "hanja": "巽", "meaning": "바람"}, "line_pattern_bottom_to_top": "011010", "core_meaning": "우물, 자리를 지키며 마르지 않고 베풂", "reflection_question": "지금 내가 한결같이 베풀고 있는 자리는 어디인가?", "practical_advice": "오늘은 내 자리에서 묵묵히 남에게 도움을 주자."}, {"number": 49, "hanja": "革", "korean_name": "택화혁", "upper_trigram": {"key": "태", "hanja": "兌", "meaning": "못"}, "lower_trigram": {"key": "리", "hanja": "離", "meaning": "불"}, "line_pattern_bottom_to_top": "101110", "core_meaning": "바꿈, 묵은 것을 고쳐 새롭게 함", "reflection_question": "지금 더 이상 미룰 수 없는 변화는 무엇인가?", "practical_advice": "오늘은 낡은 습관 하나를 바꿔볼 용기를 내보자."}, {"number": 50, "hanja": "鼎", "korean_name": "화풍정", "upper_trigram": {"key": "리", "hanja": "離", "meaning": "불"}, "lower_trigram": {"key": "손", "hanja": "巽", "meaning": "바람"}, "line_pattern_bottom_to_top": "011101", "core_meaning": "솥, 낡은 것을 새것으로 삶아 완성함", "reflection_question": "지금 내가 정성 들여 완성해야 할 것은?", "practical_advice": "오늘 하던 일을 마무리 지어 하나의 결실로 만들어보자."}, {"number": 51, "hanja": "震", "korean_name": "중뢰진", "upper_trigram": {"key": "진", "hanja": "震", "meaning": "우레"}, "lower_trigram": {"key": "진", "hanja": "震", "meaning": "우레"}, "line_pattern_bottom_to_top": "100100", "core_meaning": "거듭된 놀람과 진동, 두려워하며 삼감을 배움", "reflection_question": "지금 이 충격 속에서 내가 배워야 할 조심성은?", "practical_advice": "놀랄 일이 있어도 오늘은 당황하지 말고 침착함을 배우자."}, {"number": 52, "hanja": "艮", "korean_name": "중산간", "upper_trigram": {"key": "간", "hanja": "艮", "meaning": "산"}, "lower_trigram": {"key": "간", "hanja": "艮", "meaning": "산"}, "line_pattern_bottom_to_top": "001001", "core_meaning": "멈춤, 제자리에서 그침을 앎", "reflection_question": "지금 내가 멈춰야 할 지점은 어디인가?", "practical_advice": "오늘은 나설 때가 아니면 조용히 멈춰서 있어보자."}, {"number": 53, "hanja": "漸", "korean_name": "풍산점", "upper_trigram": {"key": "손", "hanja": "巽", "meaning": "바람"}, "lower_trigram": {"key": "간", "hanja": "艮", "meaning": "산"}, "line_pattern_bottom_to_top": "001011", "core_meaning": "점차 나아감, 순서를 밟아 서서히", "reflection_question": "지금 서두르지 말고 차례로 밟아가야 할 순서는?", "practical_advice": "오늘도 서두르지 말고 순서를 밟아 한 걸음씩 가자."}, {"number": 54, "hanja": "歸妹", "korean_name": "뇌택귀매", "upper_trigram": {"key": "진", "hanja": "震", "meaning": "우레"}, "lower_trigram": {"key": "태", "hanja": "兌", "meaning": "못"}, "line_pattern_bottom_to_top": "110100", "core_meaning": "누이를 시집보냄, 자리가 바르지 않으면 삼갈 것", "reflection_question": "지금 서두른 결정 중 다시 살펴야 할 것은?", "practical_advice": "자리가 맞지 않다 느껴지면 오늘은 무리해서 밀어붙이지 말자."}, {"number": 55, "hanja": "豐", "korean_name": "뇌화풍", "upper_trigram": {"key": "진", "hanja": "震", "meaning": "우레"}, "lower_trigram": {"key": "리", "hanja": "離", "meaning": "불"}, "line_pattern_bottom_to_top": "101100", "core_meaning": "풍성함의 절정, 정오처럼 곧 기울 것을 앎", "reflection_question": "지금 절정에서 내가 대비해야 할 다음은?", "practical_advice": "잘나갈 때일수록 오늘은 겸손하게 다음을 준비하자."}, {"number": 56, "hanja": "旅", "korean_name": "화산려", "upper_trigram": {"key": "리", "hanja": "離", "meaning": "불"}, "lower_trigram": {"key": "간", "hanja": "艮", "meaning": "산"}, "line_pattern_bottom_to_top": "001101", "core_meaning": "나그네, 낯선 곳에서 몸을 낮추고 삼감", "reflection_question": "지금 익숙지 않은 자리에서 내가 조심할 것은?", "practical_advice": "낯선 상황이라면 오늘은 나서기보다 몸을 낮춰보자."}, {"number": 57, "hanja": "巽", "korean_name": "중풍손", "upper_trigram": {"key": "손", "hanja": "巽", "meaning": "바람"}, "lower_trigram": {"key": "손", "hanja": "巽", "meaning": "바람"}, "line_pattern_bottom_to_top": "011011", "core_meaning": "바람처럼 스며듦, 겸손히 거듭 따름", "reflection_question": "지금 강하게 밀어붙이기보다 스며들듯 다가가야 할 일은?", "practical_advice": "오늘은 강하게 주장하기보다 부드럽게 스며들듯 다가가 보자."}, {"number": 58, "hanja": "兌", "korean_name": "중택태", "upper_trigram": {"key": "태", "hanja": "兌", "meaning": "못"}, "lower_trigram": {"key": "태", "hanja": "兌", "meaning": "못"}, "line_pattern_bottom_to_top": "110110", "core_meaning": "기쁨, 서로 기뻐하며 통함", "reflection_question": "지금 함께 기뻐할 수 있는 일은 무엇인가?", "practical_advice": "오늘은 함께 웃을 수 있는 말 한마디를 건네보자."}, {"number": 59, "hanja": "渙", "korean_name": "풍수환", "upper_trigram": {"key": "손", "hanja": "巽", "meaning": "바람"}, "lower_trigram": {"key": "감", "hanja": "坎", "meaning": "물"}, "line_pattern_bottom_to_top": "010011", "core_meaning": "흩어짐, 흩어진 마음을 다시 모음", "reflection_question": "지금 흩어진 마음/사람을 어떻게 다시 모을 것인가?", "practical_advice": "마음이 흩어졌다면 오늘은 다시 하나로 모아보자."}, {"number": 60, "hanja": "節", "korean_name": "수택절", "upper_trigram": {"key": "감", "hanja": "坎", "meaning": "물"}, "lower_trigram": {"key": "태", "hanja": "兌", "meaning": "못"}, "line_pattern_bottom_to_top": "110010", "core_meaning": "절제함, 마디를 두어 지나치지 않게 함", "reflection_question": "지금 내가 스스로에게 정해야 할 절제의 마디는?", "practical_advice": "오늘은 하나만 정해 지나치지 않게 절제해보자."}, {"number": 61, "hanja": "中孚", "korean_name": "풍택중부", "upper_trigram": {"key": "손", "hanja": "巽", "meaning": "바람"}, "lower_trigram": {"key": "태", "hanja": "兌", "meaning": "못"}, "line_pattern_bottom_to_top": "110011", "core_meaning": "속마음의 진실됨이 통함", "reflection_question": "지금 내가 진심으로 믿고 통하고 싶은 것은?", "practical_advice": "오늘은 겉치레보다 진심을 먼저 전해보자."}, {"number": 62, "hanja": "小過", "korean_name": "뇌산소과", "upper_trigram": {"key": "진", "hanja": "震", "meaning": "우레"}, "lower_trigram": {"key": "간", "hanja": "艮", "meaning": "산"}, "line_pattern_bottom_to_top": "001100", "core_meaning": "작은 일은 조금 지나쳐도 되나 큰일은 삼갈 것", "reflection_question": "지금 크게 벌이기보다 작게 조심스레 할 일은?", "practical_advice": "오늘 작은 것엔 너그럽되 큰 결정은 신중하게 하자."}, {"number": 63, "hanja": "既濟", "korean_name": "수화기제", "upper_trigram": {"key": "감", "hanja": "坎", "meaning": "물"}, "lower_trigram": {"key": "리", "hanja": "離", "meaning": "불"}, "line_pattern_bottom_to_top": "101010", "core_meaning": "이미 건넘, 완성됐으나 방심하면 다시 어지러움", "reflection_question": "지금 다 이뤘다고 방심하고 있는 부분은?", "practical_advice": "일이 잘 끝났어도 오늘은 마지막까지 방심하지 말자."}, {"number": 64, "hanja": "未濟", "korean_name": "화수미제", "upper_trigram": {"key": "리", "hanja": "離", "meaning": "불"}, "lower_trigram": {"key": "감", "hanja": "坎", "meaning": "물"}, "line_pattern_bottom_to_top": "010101", "core_meaning": "아직 건너지 못함, 끝나지 않았으나 희망은 있음", "reflection_question": "지금 아직 끝나지 않은 이 일에서 다음 한 걸음은?", "practical_advice": "아직 끝나지 않았다면 오늘도 희망을 놓지 말고 나아가자."}];
+const YAO = {"1":[["潛龍勿用","물속에 잠긴 용, 아직은 쓰지 말라. 드러내지 말고 실력을 길러야 할 때"],["見龍在田 利見大人","용이 밭에 나타남. 능력이 드러나기 시작하니 귀인·스승을 만나면 이롭다"],["君子終日乾乾 夕惕若 厲 无咎","종일 힘쓰고 저녁에도 살피면 위태로워도 허물이 없다. 노력하되 경계를 늦추지 말라"],["或躍在淵 无咎","뛰어오를까 물러설까 저울질하는 때. 신중히 판단하면 탈이 없다"],["飛龍在天 利見大人","나는 용이 하늘에 있음. 뜻을 펼치는 절정이니 사람과 함께할 때 이롭다"],["亢龍有悔","너무 높이 오른 용은 후회한다. 멈출 줄 알아야 할 자리"],["見羣龍无首 吉","여러 용이 우두머리 없이 나타나니 길하다. 앞서려 하지 않고 함께 가라"]],"2":[["履霜 堅冰至","서리를 밟으면 곧 단단한 얼음이 온다. 작은 조짐을 보고 미리 대비하라"],["直方大 不習 无不利","곧고 반듯하고 크니 익히지 않아도 이롭다. 타고난 바른 본성대로 하면 된다"],["含章可貞 或從王事 无成有終","아름다움을 품고 바름을 지키며, 공을 내세우지 않고 끝까지 해낸다"],["括囊 无咎无譽","주머니 입을 졸라맴. 말을 아끼면 허물도 칭찬도 없다. 조용히 몸을 지킬 때"],["黃裳 元吉","누런 치마. 겸손과 중도의 덕으로 크게 길하다"],["龍戰于野 其血玄黃","용이 들판에서 싸워 피가 낭자하다. 물러설 줄 모르면 서로 크게 다친다"],["利永貞","오래도록 바름을 지키면 이롭다. 꾸준하고 한결같이 가라"]],"3":[["磐桓 利居貞 利建侯","머뭇거리며 서성임. 바르게 자리를 지키고 도울 사람을 세우면 이롭다. 서두르지 말고 기반부터"],["屯如邅如 乘馬班如 匪寇婚媾 女子貞不字 十年乃字","어렵게 맴돌지만 오는 이는 도적이 아니라 손 내미는 사람이다. 오래 기다리면 때가 온다"],["即鹿无虞 惟入于林中 君子幾 不如舍 往吝","길잡이 없이 사슴을 쫓아 숲에 든 격. 기미를 보고 그만두는 것이 낫다"],["乘馬班如 求婚媾 往吉 无不利","머뭇거리지만 먼저 도움을 청하러 나서면 길하고 이롭다"],["屯其膏 小貞吉 大貞凶","은택이 베풀어지기 어렵다. 작은 일은 바르면 길하나 큰일을 서두르면 흉"],["乘馬班如 泣血漣如","막막하여 피눈물이 난다. 주저앉지 말고 도움을 구하라"]],"4":[["發蒙 利用刑人 用說桎梏 以往吝","어리석음을 깨우칠 땐 처음엔 엄하게, 하지만 족쇄는 풀어 주어야 한다. 얽매면 부끄럽다"],["包蒙吉 納婦吉 子克家","몽매한 이를 너그럽게 품어 주면 길하다. 품는 그릇이 집안을 일으킨다"],["勿用取女 見金夫 不有躬 无攸利","이익에 흔들려 자신을 잃는 이는 가까이하지 말라"],["困蒙 吝","갇힌 몽매, 부끄럽다. 배우지 않고 고집만 부리면 막힌다"],["童蒙 吉","어린아이처럼 순수하게 배우면 길하다. 낮은 자세가 답이다"],["擊蒙 不利為寇 利禦寇","몽매함을 치되 도적처럼 굴지 말고 막아 주듯 하라. 지나친 가르침은 폭력이 된다"]],"5":[["需于郊 利用恒 无咎","교외에서 기다림. 평소의 리듬을 지키면 허물이 없다"],["需于沙 小有言 終吉","모래밭에서 기다림. 잡음이 조금 있어도 끝내 길하다"],["需于泥 致寇至","진흙에서 기다리면 도적을 부른다. 위험 가까이서 방심하지 말라"],["需于血 出自穴","피 흘리는 자리에서 구덩이를 빠져나온다. 위험하면 순응하며 벗어나라"],["需于酒食 貞吉","술과 음식을 즐기며 기다림. 여유롭게 때를 기다리면 길하다"],["入于穴 有不速之客三人來 敬之終吉","구덩이에 들었는데 청하지 않은 손님 셋이 온다. 예로 맞이하면 끝내 길하다"]],"6":[["不永所事 小有言 終吉","다툼을 길게 끌지 않으면 말은 있어도 끝내 길하다"],["不克訟 歸而逋 其邑人三百戶 无眚","이길 수 없는 다툼은 물러나 몸을 낮추면 재앙이 없다"],["食舊德 貞厲 終吉 或從王事 无成","가진 덕을 지키며 앞서지 않으면 위태로워도 끝내 길하다"],["不克訟 復即命 渝 安貞吉","이기지 못하고 돌아와 마음을 바꾸고 편안히 바름을 지키면 길하다. 고집을 접으라"],["訟 元吉","공정하게 판결받으니 크게 길하다. 공정한 중재자가 필요하다"],["或錫之鞶帶 終朝三褫之","다퉈서 얻은 영광은 아침이 가기 전에 세 번 빼앗긴다"]],"7":[["師出以律 否臧凶","군대를 내보냄은 규율로써 한다. 규율이 없으면 흉하다. 시작은 명분과 질서"],["在師中 吉 无咎 王三錫命","군중에서 중심을 잡으니 길하고 허물이 없다. 책임자가 인정받는다"],["師或輿尸 凶","군대가 시체를 수레에 싣는 격. 주도권이 흩어지면 큰 손실"],["師左次 无咎","군대가 물러나 머문다. 형세가 불리하면 후퇴도 지혜다"],["田有禽 利執言 无咎 長子帥師 弟子輿尸 貞凶","명분이 있으면 나서도 좋으나 이끄는 이는 적임자여야 한다"],["大君有命 開國承家 小人勿用","공을 세운 뒤 보상할 때는 소인을 쓰지 말고 사람을 가려라"]],"8":[["有孚比之 无咎 有孚盈缶 終來有他吉","진심으로 친하면 허물이 없고, 진심이 가득하면 뜻밖의 길함이 온다"],["比之自內 貞吉","안에서부터 친해지니 바르면 길하다. 중심을 지키며 관계를 맺으라"],["比之匪人","가까이 지내는 이가 사람답지 않다. 사귐을 가려야 한다"],["外比之 貞吉","밖으로 어진 이와 친하니 바르면 길하다"],["顯比 王用三驅 失前禽 邑人不誡 吉","드러내 놓고 친하되 오고 가는 것을 억지로 잡지 않으니 길하다"],["比之无首 凶","친함에 시작이 없다. 처음에 마음을 모으지 못하면 끝도 흉하다"]],"9":[["復自道 何其咎 吉","제 길로 돌아오니 무슨 허물이 있으랴. 길하다"],["牽復 吉","이끌려 함께 돌아오니 길하다"],["輿說輻 夫妻反目","수레 바퀴살이 빠지고 부부가 등을 돌린다. 무리하게 나아가면 불화"],["有孚 血去惕出 无咎","진심이 있으면 상처와 두려움이 사라져 허물이 없다"],["有孚攣如 富以其鄰","진심으로 이웃과 이어져 함께 넉넉해진다"],["旣雨旣處 尙德載 婦貞厲 月幾望 君子征凶","비가 내리고 그쳤다. 가득 찬 때에 더 나아가면 흉하다"]],"10":[["素履 往无咎","소박하게 밟아 가니 나아가도 허물이 없다"],["履道坦坦 幽人貞吉","길이 평탄하니 고요한 사람이 바름을 지키면 길하다"],["眇能視 跛能履 履虎尾 咥人 凶","능력 밖의 일을 하다 호랑이 꼬리를 밟아 물린다. 흉하다"],["履虎尾 愬愬 終吉","호랑이 꼬리를 밟아도 두려워하며 삼가니 끝내 길하다"],["夬履 貞厲","결단하여 밟으니 바르게 해도 위태롭다. 과단성에 신중함을 더하라"],["視履考祥 其旋元吉","걸어온 길을 돌아보고 살피니 돌아오면 크게 길하다"]],"11":[["拔茅茹 以其彙 征吉","띠풀 뿌리를 뽑으면 줄기째 딸려 온다. 뜻 맞는 이들과 함께 나아가면 길하다"],["包荒 用馮河 不遐遺 朋亡 得尙于中行","거친 것도 품고 과감히 건너며 먼 데도 버리지 않는다. 포용과 결단"],["无平不陂 无往不復 艱貞无咎 勿恤其孚 于食有福","평탄함은 기울고 간 것은 돌아온다. 어려움 속 바름을 지키면 복이 있다"],["翩翩 不富以其鄰 不戒以孚","훨훨 내려와 이웃과 함께한다. 경계 없이 진심으로 통한다"],["帝乙歸妹 以祉元吉","자신을 낮추어 화합하니 복되고 크게 길하다"],["城復于隍 勿用師 自邑告命 貞吝","성이 무너져 해자로 돌아간다. 군사를 쓰지 말고 안부터 다스려라. 태평의 끝은 쇠락"]],"12":[["拔茅茹 以其彙 貞吉亨","띠풀 뿌리를 뽑듯 뜻 맞는 이들과 바름을 지키면 길하고 형통하다"],["包承 小人吉 大人否亨","소인은 순종해 길하나 대인은 막힘 속에서도 도를 지켜 형통하다"],["包羞","부끄러움을 품는다. 옳지 않은 자리의 수치"],["有命无咎 疇離祉","명이 있으면 허물이 없고 무리가 복을 함께한다. 막힘이 풀리기 시작"],["休否 大人吉 其亡其亡 繫于苞桑","막힘을 그치게 하니 길하다. 망할까 늘 경계하면 뽕나무 뿌리에 맨 듯 굳건하다"],["傾否 先否後喜","막힘이 뒤집힌다. 처음엔 막혔으나 나중엔 기쁘다"]],"13":[["同人于門 无咎","문 앞에서 사람들과 함께한다. 사심 없이 열어 두면 허물이 없다"],["同人于宗 吝","같은 패끼리만 어울리면 부끄럽다"],["伏戎于莽 升其高陵 三歲不興","숲에 군사를 숨기고 언덕에서 엿본다. 의심만 하면 오래도록 일어서지 못한다"],["乘其墉 弗克攻 吉","담에 올랐으나 공격하지 않으니 길하다. 싸움을 접으라"],["同人 先號咷而後笑 大師克相遇","함께하는 이들이 처음엔 울부짖다 나중에 웃는다. 큰 힘으로 만난다"],["同人于郊 无悔","교외에서 함께하니 후회는 없다. 넓게 모이나 깊이는 모자라다"]],"14":[["无交害 匪咎 艱則无咎","해로운 사귐이 없으니 허물이 아니다. 어렵게 여기면 탈이 없다"],["大車以載 有攸往 无咎","큰 수레에 싣고 간다. 감당할 그릇이 있으니 나아가도 좋다"],["公用亨于天子 小人弗克","공이 천자께 바친다. 소인은 하지 못하는 나눔의 자세"],["匪其彭 无咎","성함을 뽐내지 않으면 허물이 없다"],["厥孚交如 威如 吉","믿음으로 사귀고 위엄도 있으니 길하다"],["自天祐之 吉无不利","하늘이 도우니 길하여 이롭지 않음이 없다"]],"15":[["謙謙君子 用涉大川 吉","겸손하고 또 겸손한 군자는 큰 내를 건너도 길하다"],["鳴謙 貞吉","겸손이 저절로 알려진다. 바르면 길하다"],["勞謙君子 有終吉","수고하고도 겸손한 군자는 끝이 좋다"],["无不利 撝謙","이롭지 않음이 없다. 겸손을 널리 펼쳐라"],["不富以其鄰 利用侵伐 无不利","이웃과 함께한다. 필요하면 바로잡는 일도 이롭다"],["鳴謙 利用行師 征邑國","겸손이 널리 알려졌다. 먼저 안을 바로잡는 데 힘을 쓰라"]],"16":[["鳴豫 凶","즐거움을 떠벌리니 흉하다"],["介于石 不終日 貞吉","돌처럼 단단히 중심을 잡고 하루를 넘기지 않고 알아챈다. 바르면 길하다"],["盱豫 悔 遲有悔","올려다보며 즐거움을 바라다 후회한다. 늦어도 후회"],["由豫 大有得 勿疑 朋盍簪","그로 말미암아 크게 얻는다. 의심 말라, 벗이 모여든다"],["貞疾 恒不死","오래 병을 앓지만 죽지는 않는다. 눌려도 버텨 살아남는다"],["冥豫 成有渝 无咎","어두운 즐거움에 빠졌으나 마음을 바꾸면 허물이 없다"]],"17":[["官有渝 貞吉 出門交有功","주관이 바뀔 수 있으나 바르면 길하다. 문밖으로 나가 사귀면 공이 있다"],["係小子 失丈夫","작은 것에 매이면 큰 것을 잃는다"],["係丈夫 失小子 隨有求得 利居貞","큰 것을 따르고 작은 것을 놓는다. 구하면 얻으나 자리를 지켜야 이롭다"],["隨有獲 貞凶 有孚在道 以明 何咎","따라서 얻는 것이 있어도 욕심이면 흉하다. 진심과 밝은 도를 지키면 허물이 없다"],["孚于嘉 吉","아름다운 것에 진심을 두니 길하다"],["拘係之 乃從維之 王用亨于西山","단단히 묶어 붙잡을 만큼 깊이 따른다. 따름이 극진하다"]],"18":[["幹父之蠱 有子 考无咎 厲終吉","이전 세대가 남긴 문제를 바로잡는다. 위태로워도 끝내 길하다"],["幹母之蠱 不可貞","묵은 문제를 바로잡되 너무 곧게만 밀어붙이지 말라"],["幹父之蠱 小有悔 无大咎","문제를 바로잡다 작은 후회는 있어도 큰 허물은 없다"],["裕父之蠱 往見吝","묵은 문제를 느슨하게 넘기면 갈수록 부끄러워진다"],["幹父之蠱 用譽","묵은 문제를 바로잡아 명예를 얻는다"],["不事王侯 高尚其事","세속의 일을 벗어나 자기 뜻을 높이 지킨다"]],"19":[["咸臨 貞吉","함께 감응하며 다가가니 바르면 길하다"],["咸臨 吉无不利","함께 감응하며 다가가니 길하고 이롭지 않음이 없다"],["甘臨 无攸利 旣憂之 无咎","달콤한 말로 다가가면 이로울 게 없다. 근심하여 고치면 허물이 없다"],["至臨 无咎","성심껏 가까이 다가가니 허물이 없다"],["知臨 大君之宜 吉","지혜로 다스리고 맡길 줄 아니 길하다"],["敦臨 吉无咎","두터운 마음으로 다가가니 길하고 허물이 없다"]],"20":[["童觀 小人无咎 君子吝","어린아이처럼 보니 평범한 이는 괜찮으나 군자는 부끄럽다. 얕은 안목"],["闚觀 利女貞","문틈으로 엿보는 좁은 시야. 안에서 지킬 땐 괜찮다"],["觀我生 進退","나의 삶을 돌아보며 나아갈지 물러설지 정한다"],["觀國之光 利用賓于王","나라의 빛을 보니 귀한 자리에 쓰이면 이롭다"],["觀我生 君子无咎","나의 삶을 돌아보는 군자는 허물이 없다"],["觀其生 君子无咎","남의 삶을 살피는 군자는 허물이 없다. 본보기가 되는 위치"]],"21":[["屨校滅趾 无咎","차꼬에 발이 묶여 갇힌다. 작게 막으니 큰 허물은 없다"],["噬膚滅鼻 无咎","연한 살을 씹다 코가 묻힌다. 쉽게 풀리지만 지나치지 말라"],["噬腊肉 遇毒 小吝 无咎","오래 묵은 고기를 씹다 독을 만난다. 약간 부끄러우나 허물은 없다"],["噬乾胏 得金矢 利艱貞 吉","뼈 붙은 마른 고기를 씹는다. 어려움을 바름으로 견디면 길하다"],["噬乾肉 得黃金 貞厲 无咎","마른 고기를 씹고 금을 얻는다. 위태로워도 바르면 허물이 없다"],["何校滅耳 凶","칼을 쓰고 귀가 가려진다. 듣지 않고 고집하면 흉하다"]],"22":[["賁其趾 舍車而徒","발걸음을 꾸미고 수레를 버려 걸어간다. 과시보다 소박한 길"],["賁其須","수염을 꾸민다. 본체를 따라 자연스레 꾸민다"],["賁如濡如 永貞吉","윤기 나게 꾸미니 오래 바름을 지키면 길하다"],["賁如皤如 白馬翰如 匪寇婚媾","하얗게 꾸미고 흰 말이 달려온다. 도적이 아니라 청하러 온 사람이다"],["賁于丘園 束帛戔戔 吝 終吉","언덕 동산을 꾸민다. 소박한 예물에 인색해 보여도 끝내 길하다"],["白賁 无咎","흰 꾸밈이다. 본질로 돌아간 꾸밈이니 허물이 없다"]],"23":[["剝牀以足 蔑貞 凶","침상의 다리부터 깎여 나간다. 바른 것이 무시되니 흉하다"],["剝牀以辨 蔑貞 凶","침상이 몸통까지 깎인다. 깎임이 가까워졌다"],["剝之 无咎","깎여 나가는 속에서도 올바른 쪽을 따르면 허물이 없다"],["剝牀以膚 凶","침상을 깎아 살갗에 이르렀다. 해가 몸에 닿았다"],["貫魚 以宮人寵 无不利","물고기를 꿰듯 질서 있게 따르면 이롭지 않음이 없다"],["碩果不食 君子得輿 小人剝廬","큰 열매가 먹히지 않고 남는다. 군자는 수레를 얻고 소인은 집을 잃는다"]],"24":[["不遠復 无祇悔 元吉","멀리 가지 않고 돌아오니 후회가 없고 크게 길하다"],["休復 吉","아름답게 돌아오니 길하다"],["頻復 厲无咎","자꾸 돌아오니 위태롭지만 허물은 없다"],["中行獨復","무리 속에서 홀로 돌아온다. 자기 길로 돌아가라"],["敦復 无悔","돈독하게 돌아오니 후회가 없다"],["迷復 凶 有災眚 用行師 終有大敗","돌아올 길을 잃으니 재앙이 있다. 밀어붙이면 크게 패한다"]],"25":[["无妄 往吉","꾸밈없이 진실하게 나아가니 길하다"],["不耕穫 不菑畬 則利有攸往","밭 갈기 전에 거둘 생각을 말라. 결과를 바라지 않고 하면 나아가도 이롭다"],["无妄之災 或繫之牛 行人之得 邑人之災","뜻하지 않은 재난이 온다. 내 잘못이 아닌 일에 휘말릴 수 있다"],["可貞 无咎","바름을 지키면 허물이 없다"],["无妄之疾 勿藥有喜","뜻밖의 병은 약을 쓰지 않아도 낫는다. 억지로 손대지 말라"],["无妄 行有眚 无攸利","진실하더라도 때를 모르고 나아가면 재앙이 있다"]],"26":[["有厲 利已","나아가면 위태롭다. 멈추는 것이 이롭다"],["輿說輹","수레의 바퀴 축을 풀어 둔다. 스스로 멈추고 힘을 쌓는다"],["良馬逐 利艱貞 日閑輿衛 利有攸往","좋은 말이 달려도 어려움을 알고 날마다 수레와 호위를 익히면 나아가도 이롭다"],["童牛之牿 元吉","송아지의 뿔에 가로나무를 대 미리 막으니 크게 길하다"],["豶豕之牙 吉","거세한 돼지의 어금니. 힘을 근본에서 다스리니 길하다"],["何天之衢 亨","하늘의 큰길을 진다. 쌓은 것이 풀려 막힘없이 형통하다"]],"27":[["舍爾靈龜 觀我朵頤 凶","내 영험한 거북을 버리고 남의 먹는 모습만 부러워하니 흉하다"],["顚頤 拂經于丘頤 征凶","스스로 기르지 못하고 남에게 기대거나 원칙을 어기면 나아가 흉하다"],["拂頤 貞凶 十年勿用 无攸利","기름의 도리를 거슬러 오래도록 쓰이지 못한다"],["顚頤 吉 虎視眈眈 其欲逐逐 无咎","위에서 아래를 길러 주되 호랑이처럼 집중하면 허물이 없다"],["拂經 居貞吉 不可涉大川","원칙에서 어긋나도 자리를 지키면 길하나 큰 모험은 안 된다"],["由頤 厲吉 利涉大川","모두가 이로 말미암아 기르니 위태로우나 길하고 큰 내를 건너도 이롭다"]],"28":[["藉用白茅 无咎","흰 띠풀을 깔고 올려놓는다. 조심하는 자세로 허물이 없다"],["枯楊生稊 老夫得其女妻 无不利","마른 버드나무에 새싹이 난다. 지친 곳에 새 활력이 든다"],["棟橈 凶","대들보가 휜다. 짐이 너무 무거워 버티지 못한다"],["棟隆 吉 有它吝","대들보가 솟아 단단하니 길하나 딴 마음을 품으면 부끄럽다"],["枯楊生華 老婦得士夫 无咎无譽","마른 버드나무에 꽃이 핀다. 오래가지 못하는 일시적 활기"],["過涉滅頂 凶 无咎","무리해 건너다 물에 잠긴다. 흉하나 뜻은 허물이 아니다"]],"29":[["習坎 入于坎窞 凶","거듭된 구덩이 속 더 깊은 구덩이에 빠진다. 흉하다"],["坎有險 求小得","구덩이에 위험이 있으나 작은 것을 구하면 얻는다"],["來之坎坎 險且枕 入于坎窞 勿用","오고 가는 곳마다 구덩이이니 움직이지 말고 때를 기다리라"],["樽酒簋貳 用缶 納約自牖 終无咎","술 한 통 밥 한 그릇을 질그릇에 담아 창으로 올린다. 소박한 정성으로 허물이 없다"],["坎不盈 祇旣平 无咎","물이 가득 차지 않아도 평평해지면 허물이 없다"],["係用徽纆 寘于叢棘 三歲不得 凶","밧줄에 묶여 가시덤불에 놓인다. 오래 헤어나지 못하니 흉하다"]],"30":[["履錯然 敬之 无咎","발걸음이 어지러우니 신중히 삼가면 허물이 없다"],["黃離 元吉","누런 빛으로 밝게 붙는다. 중도를 지켜 크게 길하다"],["日昃之離 不鼓缶而歌 則大耋之嗟 凶","해가 기운다. 즐거워하지 않고 늙음을 한탄하면 흉하다"],["突如其來如 焚如 死如 棄如","갑자기 닥친 불길이 사그라든다. 급하게 타오르는 것은 오래가지 못한다"],["出涕沱若 戚嗟若 吉","눈물을 쏟고 슬퍼하며 반성하니 길하다"],["王用出征 有嘉折首 獲匪其醜 无咎","우두머리만 바로잡고 무리를 다치지 않게 하니 허물이 없다"]],"31":[["咸其拇","엄지발가락이 감응한다. 마음이 막 움직이는 시작"],["咸其腓 凶 居吉","장딴지가 감응한다. 섣불리 움직이면 흉하고 머물면 길하다"],["咸其股 執其隨 往吝","허벅지가 감응한다. 휩쓸려 따르면 부끄럽다"],["貞吉悔亡 憧憧往來 朋從爾思","바르면 길하고 후회가 없다. 마음이 오락가락하면 친구도 그 생각만 따른다"],["咸其脢 无悔","등살이 감응한다. 크게 마음이 움직이지 않아 후회가 없다"],["咸其輔頰舌","턱과 뺨과 혀가 감응한다. 말로만 통하려는 상태"]],"32":[["浚恆 貞凶 无攸利","처음부터 깊이 파고들어 한결같기를 바란다. 서두르면 흉하다"],["悔亡","후회가 사라진다. 중도를 지켜 오래 간다"],["不恆其德 或承之羞 貞吝","덕을 한결같이 지키지 못하니 부끄러움을 부른다"],["田无禽","사냥터에 짐승이 없다. 엉뚱한 곳에서 오래 해도 소득이 없다"],["恆其德 貞 婦人吉 夫子凶","한결같은 덕이다. 따를 땐 길하나 이끌 땐 변화가 필요하다"],["振恆 凶","한결같음을 흔들어 놓는다. 조급하면 흉하다"]],"33":[["遯尾 厲 勿用有攸往","물러나는 꼬리에 서 있다. 위태로우니 움직이지 말고 가만히 있으라"],["執之用黃牛之革 莫之勝說","누런 소가죽으로 단단히 묶는다. 물러서지 않으려는 뜻이 굳건하다"],["係遯 有疾厲 畜臣妾吉","발이 묶여 물러나지 못한다. 병들 듯 힘드나 작은 일을 돌보면 길하다"],["好遯 君子吉 小人否","좋아하며 물러난다. 군자는 길하나 소인은 그러지 못한다"],["嘉遯 貞吉","아름답게 물러나니 바르면 길하다"],["肥遯 无不利","여유롭게 물러나니 이롭지 않음이 없다"]],"34":[["壯于趾 征凶 有孚","발부리에 힘을 주어 서두른다. 나아가면 흉하다"],["貞吉","바르게 지키니 길하다"],["小人用壯 君子用罔 貞厲 羝羊觸藩 羸其角","힘만 믿고 들이받다 뿔이 울타리에 걸린다. 위태롭다"],["貞吉悔亡 藩決不羸 壯于大輿之輹","바르면 길하고 후회가 없다. 울타리가 열려 막힘없이 나아간다"],["喪羊于易 无悔","양을 쉽게 잃는다. 힘을 쓰지 않고 부드러워지니 후회가 없다"],["羝羊觸藩 不能退 不能遂 无攸利 艱則吉","뿔이 걸려 물러나지도 나아가지도 못한다. 어렵게 여기면 길하다"]],"35":[["晉如摧如 貞吉 罔孚 裕无咎","나아가다 꺾인다. 바르게 지키고 여유를 가지면 허물이 없다"],["晉如愁如 貞吉 受茲介福 于其王母","나아가며 근심이 있으나 바르면 길하다. 큰 복을 받는다"],["眾允 悔亡","무리가 믿어 주니 후회가 사라진다"],["晉如鼫鼠 貞厲","쥐처럼 가진 것을 믿고 나아가니 위태롭다. 욕심을 경계하라"],["悔亡 失得勿恤 往吉无不利","후회가 사라진다. 득실에 마음 쓰지 말고 나아가면 길하다"],["晉其角 維用伐邑 厲吉无咎 貞吝","뿔 끝까지 나아간다. 스스로를 다스리는 데 쓰면 허물이 없다"]],"36":[["明夷于飛 垂其翼 君子于行 三日不食","날개를 드리우고 난다. 어려운 시기에 사흘을 굶는 듯 몸을 낮추고 떠나라"],["明夷 夷于左股 用拯馬壯 吉","왼쪽 허벅지를 다쳤으나 건장한 말로 구해 길하다"],["明夷于南狩 得其大首 不可疾貞","남쪽에서 사냥해 우두머리를 얻는다. 급히 바로잡으려 하지 말라"],["入于左腹 獲明夷之心 于出門庭","어둠의 속내를 알아채고 문밖으로 피한다"],["箕子之明夷 利貞","기자처럼 어둠 속에서도 밝음을 감추고 바름을 지키면 이롭다"],["不明晦 初登于天 後入于地","밝지 않고 어둡다. 처음엔 하늘에 올랐으나 나중엔 땅에 떨어진다"]],"37":[["閑有家 悔亡","집안의 규범을 처음부터 세우니 후회가 없다"],["无攸遂 在中饋 貞吉","제멋대로 하지 않고 집안을 돌보면 바르고 길하다"],["家人嗃嗃 悔厲吉 婦子嘻嘻 終吉","엄하게 다스리면 괴로우나 길하고, 풀어 주면 끝이 부끄럽다"],["富家 大吉","집안을 넉넉하게 하니 크게 길하다"],["王假有家 勿恤 吉","왕이 집안을 지극히 하니 걱정이 없고 길하다"],["有孚威如 終吉","진실하고 위엄이 있으니 끝내 길하다"]],"38":[["悔亡 喪馬勿逐 自復 見惡人 无咎","후회가 없다. 잃은 말은 쫓지 않아도 돌아온다. 악인을 만나도 허물이 없다"],["遇主于巷 无咎","골목에서 주인을 만난다. 정면이 아닌 곳에서 풀리니 허물이 없다"],["見輿曳 其牛掣 其人天且劓 无初有終","수레가 끌려가고 소가 막히며 고초를 겪으나 끝은 좋다"],["睽孤 遇元夫 交孚 厲无咎","어긋나 외로울 때 믿을 만한 사람을 만난다. 위태로우나 허물이 없다"],["悔亡 厥宗噬膚 往何咎","후회가 없다. 가까운 이가 깊이 통해 주니 나아가도 허물이 없다"],["睽孤 見豕負塗 載鬼一車 先張之弧 後說之弧","의심이 지나쳐 헛것을 본다. 의심을 풀면 오해가 풀려 길하다"]],"39":[["往蹇 來譽","나아가면 어렵고 물러나 대비하면 칭찬을 받는다"],["王臣蹇蹇 匪躬之故","왕의 신하가 어렵고 어려운 일을 한다. 나를 위해서가 아닌 일이다"],["往蹇 來反","나아가면 어렵고 돌아오면 안이 편안하다"],["往蹇 來連","나아가면 어렵고 돌아오면 이어지는 이가 있다"],["大蹇 朋來","큰 어려움 속에 벗이 와서 돕는다"],["往蹇 來碩 吉 利見大人","나아가면 어렵고 돌아와 큰 성과를 얻는다. 귀인을 만나면 이롭다"]],"40":[["无咎","허물이 없다. 풀림의 시작이니 편안히 하라"],["田獲三狐 得黃矢 貞吉","사냥에서 여우 셋을 잡고 황금 화살을 얻는다. 간사한 것을 가려내 길하다"],["負且乘 致寇至 貞吝","짐을 지고 수레에 탄 격이다. 자리에 맞지 않으면 도적을 부른다"],["解而拇 朋至斯孚","엄지발가락의 묶인 것을 푼다. 벗이 와 믿음이 생긴다"],["君子維有解 吉 有孚于小人","군자가 풀어 주니 길하고 소인도 믿고 따른다"],["公用射隼于高墉之上 獲之 无不利","높은 담 위의 매를 쏘아 잡는다. 근본적인 걸림돌을 제거하니 이롭지 않음이 없다"]],"41":[["已事遄往 无咎 酌損之","할 일을 마치면 서둘러 나선다. 허물이 없으니 헤아려 덜어라"],["利貞 征凶 弗損益之","바르게 지키면 이롭고 서두르면 흉하다. 덜지 않고 더하는 것이 길이다"],["三人行 則損一人 一人行 則得其友","셋이 가면 하나가 덜리고 혼자 가면 벗을 얻는다. 짝을 맞춰 덜어낸다"],["損其疾 使遄有喜 无咎","병을 덜어내니 빨리 기쁨이 온다. 허물이 없다"],["或益之十朋之龜 弗克違 元吉","큰 이익이 뜻밖에 주어지니 거스를 수 없다. 크게 길하다"],["弗損益之 无咎 貞吉 利有攸往","덜지 않고 보탠다. 허물이 없고 길하며 나아가면 이롭다"]],"42":[["利用為大作 元吉 无咎","큰일을 일으키기에 이롭다. 크게 길하고 허물이 없다"],["或益之十朋之龜 弗克違 永貞吉","큰 이익이 주어지니 거스를 수 없다. 오래 바르면 길하다"],["益之用凶事 无咎 有孚中行","어려운 일에 더해 주니 진심으로 중도를 지키면 허물이 없다"],["中行 告公從 利用為依遷國","중도를 지켜 의견을 구하니 따른다. 큰 변화에도 의지가 된다"],["有孚惠心 勿問元吉 有孚惠我德","진심으로 은혜를 베푸니 묻지 않아도 크게 길하다"],["莫益之 或擊之 立心勿恒 凶","더해 주는 이가 없고 공격받는다. 욕심에 마음이 변하니 흉하다"]],"43":[["壯于前趾 往不勝為咎","발끝에 힘만 주고 나아가면 이기지 못해 허물이 된다"],["惕號 莫夜有戎 勿恤","두려워 외치지만 밤에 병사가 와도 대비가 되어 있으니 걱정할 일이 아니다"],["壯于頄 有凶 君子夬夬 獨行遇雨 若濡有慍 无咎","얼굴에 힘이 들어가면 흉하다. 군자는 홀로 비를 맞는 불쾌함을 견디면 허물이 없다"],["臀无膚 其行次且 牽羊悔亡 聞言不信","엉덩이 살이 없는 듯 머뭇거린다. 양처럼 이끌려 가면 후회가 없으나 충고를 믿지 않는다"],["莧陸夬夬 中行无咎","쇠비름 같은 것을 단호히 끊는다. 중도를 지키면 허물이 없다"],["无號 終有凶","외칠 곳이 없다. 마지막에 흉함이 있다"]],"44":[["繫于金柅 貞吉 有攸往 見凶 羸豕孚蹢躅","쇠 고임목에 묶어 둔다. 가만히 있으면 길하고 나아가면 흉하다"],["包有魚 无咎 不利賓","꾸러미에 물고기가 있다. 허물이 없으나 손님에게는 이롭지 않다"],["臀无膚 其行次且 厲 无大咎","엉덩이 살이 없는 듯 머뭇거린다. 위태로우나 큰 허물은 없다"],["包无魚 起凶","꾸러미에 물고기가 없다. 사람이 떠나가니 일이 흉하다"],["以杞包瓜 含章 有隕自天","버들잎으로 오이를 감싼다. 덕을 품으면 하늘에서 복이 떨어진다"],["姤其角 吝 无咎","뿔로 만난다. 부끄러우나 허물은 없다"]],"45":[["有孚不終 乃亂乃萃 若號 一握為笑 勿恤 往无咎","믿음이 끝까지 가지 못해 어지러이 모인다. 외치면 웃음으로 바뀌니 걱정 말고 가라"],["引吉 无咎 孚乃利用禴","이끌려 모이니 길하다. 진심이 있으니 소박한 제사도 이롭다"],["萃如嗟如 无攸利 往无咎 小吝","모이려다 탄식한다. 이로운 것이 없으나 나아가면 허물은 없다"],["大吉 无咎","크게 길하고 허물이 없다"],["萃有位 无咎 匪孚 元永貞 悔亡","모임에 자리가 있다. 믿음을 얻지 못하면 으뜸의 덕을 오래 지켜라"],["齎咨涕洟 无咎","탄식하며 눈물 흘린다. 반성하니 허물이 없다"]],"46":[["允升 大吉","믿고 따라 오르니 크게 길하다"],["孚乃利用禴 无咎","진심이 있으니 소박해도 이롭고 허물이 없다"],["升虛邑","빈 고을에 오른다. 막힘이 없이 나아간다"],["王用亨于岐山 吉 无咎","기산에서 제사를 올린다. 길하고 허물이 없다"],["貞吉 升階","바르면 길하다. 계단을 오르듯 차근차근 오른다"],["冥升 利于不息之貞","어둡게 오른다. 쉬지 않는 바름으로 계속 닦아야 이롭다"]],"47":[["臀困于株木 入于幽谷 三歲不覿","나무 그루터기에 앉아 괴롭고 어두운 골짜기에 든다. 한동안 빛을 보지 못한다"],["困于酒食 朱紱方來 利用享祀 征凶 无咎","먹고 마실 것에 곤하나 귀한 이가 온다. 나아가면 흉하나 정성을 쏟으면 허물이 없다"],["困于石 據于蒺藜 入于其宮 不見其妻 凶","돌에 막히고 가시덤불에 의지한다. 집에 돌아가도 반기는 이가 없으니 흉하다"],["來徐徐 困于金車 吝 有終","느릿느릿 와서 쇠수레에 막힌다. 부끄러우나 끝은 좋다"],["劓刖 困于赤紱 乃徐有說 利用祭祀","코와 발이 베인 듯 곤하나 서서히 기뻐진다. 정성을 다하면 이롭다"],["困于葛藟 于臲卼 曰動悔有悔 征吉","칡덩굴에 얽혀 위태롭다. 움직이면 후회하나 뉘우치고 나아가면 길하다"]],"48":[["井泥不食 舊井无禽","우물이 진흙이라 마실 수 없다. 낡은 우물에는 새도 오지 않는다"],["井谷射鮒 甕敝漏","우물물이 붕어에게 쏟아지고 항아리가 샌다. 쓰임이 엉뚱한 데로 샌다"],["井渫不食 為我心惻 可用汲 王明 並受其福","우물을 쳤는데 마시는 이가 없어 마음이 아프다. 알아주는 이가 있으면 함께 복을 받는다"],["井甃 无咎","우물벽을 쌓아 고친다. 허물이 없다"],["井冽 寒泉食","우물이 맑고 차가워 마시기 좋다"],["井收勿幕 有孚元吉","우물을 길어 올리고 덮지 않는다. 믿음으로 크게 길하다"]],"49":[["鞏用黃牛之革","누런 소가죽으로 단단히 묶는다. 아직은 바꾸지 말고 굳게 지켜라"],["巳日乃革之 征吉 无咎","때가 무르익은 날에 바꾼다. 나아가면 길하고 허물이 없다"],["征凶 貞厲 革言三就 有孚","서두르면 흉하다. 바꿀 말을 세 번 거듭 살펴 믿음을 얻은 뒤 하라"],["悔亡 有孚改命 吉","후회가 없다. 진심으로 명을 바꾸니 길하다"],["大人虎變 未占有孚","대인이 호랑이처럼 변한다. 점치지 않아도 믿음이 있다"],["君子豹變 小人革面 征凶 居貞吉","군자는 표범처럼 변하고 소인은 얼굴만 바꾼다. 더 나아가면 흉하고 지키면 길하다"]],"50":[["鼎顚趾 利出否 得妾以其子 无咎","솥이 뒤집혀 묵은 것이 쏟아진다. 막힌 것을 비워 새로 시작하면 허물이 없다"],["鼎有實 我仇有疾 不我能卽 吉","솥에 내용이 가득하다. 시샘하는 이가 해치지 못하니 길하다"],["鼎耳革 其行塞 雉膏不食 方雨虧悔 終吉","솥귀가 바뀌어 옮기지 못한다. 좋은 음식이 있어도 못 먹으나 끝내 길하다"],["鼎折足 覆公餗 其形渥 凶","솥다리가 부러져 음식을 엎는다. 감당 못 할 일을 맡으니 흉하다"],["鼎黃耳金鉉 利貞","솥에 누런 귀와 금 고리가 있다. 바르게 지키면 이롭다"],["鼎玉鉉 大吉 无不利","솥에 옥고리가 달렸다. 부드럽고 단단하여 크게 길하다"]],"51":[["震來虩虩 後笑言啞啞 吉","우레가 오면 두려워 떨지만 나중엔 웃으며 이야기한다. 길하다"],["震來厲 億喪貝 躋于九陵 勿逐 七日得","우레가 오니 위태롭다. 재물을 잃어도 쫓지 말라. 이레면 되돌아온다"],["震蘇蘇 震行无眚","놀라 정신을 못 차리나 놀람을 따라 행동을 바로잡으면 재앙이 없다"],["震遂泥","우레가 진흙에 빠진다. 힘을 잃고 정신이 흐려진다"],["震往來厲 億无喪 有事","우레가 오가니 위태롭다. 중심을 지키면 잃을 것이 없다"],["震索索 視矍矍 征凶 震不于其躬 于其鄰 无咎","두려워 떨며 눈이 흔들린다. 나아가면 흉하다. 내게 닥치기 전 이웃의 일을 보고 대비하면 허물이 없다"]],"52":[["艮其趾 无咎 利永貞","발을 멈춘다. 처음에 그치니 허물이 없고 오래 바르면 이롭다"],["艮其腓 不拯其隨 其心不快","장딴지에서 멈춘다. 따르는 이를 구하지 못해 마음이 불쾌하다"],["艮其限 列其夤 厲薰心","허리에서 멈춰 등줄기가 찢어진다. 억지로 멈추려니 마음이 탄다"],["艮其身 无咎","몸을 멈춘다. 스스로를 단속하니 허물이 없다"],["艮其輔 言有序 悔亡","입을 멈춘다. 말에 질서가 있으니 후회가 없다"],["敦艮 吉","두터운 멈춤이다. 그칠 때 그칠 줄 아니 길하다"]],"53":[["鴻漸于干 小子厲 有言 无咎","기러기가 물가에 다가선다. 작은 말은 있어도 허물이 없다"],["鴻漸于磐 飲食衎衎 吉","기러기가 반석에 오른다. 즐겁게 먹고 마시니 길하다"],["鴻漸于陸 夫征不復 婦孕不育 凶 利禦寇","기러기가 뭍에 오른다. 너무 나아가 돌아오지 못하면 흉하다"],["鴻漸于木 或得其桷 无咎","기러기가 나무에 앉는다. 편한 가지를 얻으면 허물이 없다"],["鴻漸于陵 婦三歲不孕 終莫之勝 吉","기러기가 언덕에 오른다. 방해가 있어도 끝내 이겨내니 길하다"],["鴻漸于陸 其羽可用為儀 吉","기러기가 높은 하늘로 날아가며 그 깃이 본보기가 된다. 길하다"]],"54":[["歸妹以娣 跛能履 征吉","작은 자리로 시집가나 절룩이면서도 걸어간다. 나아가면 길하다"],["眇能視 利幽人之貞","애꾸눈이 보는 격이다. 조용히 바름을 지키는 이에게 이롭다"],["歸妹以須 反歸以娣","기다리다 도리어 낮은 자리로 간다. 분수를 알라"],["歸妹愆期 遲歸有時","혼기를 놓쳤으나 늦게 가도 때가 있다"],["帝乙歸妹 其君之袂 不如其娣之袂良 月幾望 吉","귀한 이가 시집가도 꾸밈이 소박하다. 가득 차기 직전이라 길하다"],["女承筐无實 士刲羊无血 无攸利","광주리를 받아도 열매가 없고 양을 잡아도 피가 없다. 알맹이가 없어 이로울 것이 없다"]],"55":[["遇其配主 雖旬无咎 往有尚","짝이 되는 주인을 만난다. 열흘 머물러도 허물이 없고 나아가면 높이 평가받는다"],["豐其蔀 日中見斗 往得疑疾 有孚發若 吉","한낮에 가려 북두성이 보인다. 나아가면 의심받으나 진심을 내보이면 길하다"],["豐其沛 日中見沬 折其右肱 无咎","한낮에 어두워 오른팔이 부러진다. 허물은 없다"],["豐其蔀 日中見斗 遇其夷主 吉","한낮에 가려 북두성이 보이나 동등한 주인을 만나니 길하다"],["來章 有慶譽 吉","훌륭한 이를 불러들이니 경사와 명예가 있다. 길하다"],["豐其屋 蔀其家 闚其戶 闃其无人 三歲不覿 凶","집을 크게 짓고 가려 놓으니 들여다봐도 인기척이 없다. 오래 만나지 못하니 흉하다"]],"56":[["旅瑣瑣 斯其所取災","나그네가 사소한 데 매달리니 스스로 재앙을 부른다"],["旅卽次 懷其資 得童僕貞","나그네가 묵을 곳을 얻고 재물을 품었으며 충직한 종을 얻는다"],["旅焚其次 喪其童僕 貞厲","나그네가 묵는 곳을 태우고 종을 잃는다. 오만하면 위태롭다"],["旅于處 得其資斧 我心不快","머무를 곳은 얻었으나 마음이 편치 않다"],["射雉 一矢亡 終以譽命","꿩을 쏘다 화살 하나를 잃지만 끝내 명예를 얻는다"],["鳥焚其巢 旅人先笑後號咷 喪牛于易 凶","새가 둥지를 태운다. 웃다가 통곡하게 되니 방심은 흉하다"]],"57":[["進退 利武人之貞","나아갈까 물러설까 망설인다. 결단력 있는 태도로 바름을 지키면 이롭다"],["巽在牀下 用史巫紛若 吉无咎","침상 아래까지 낮추어 스며든다. 정성을 다해 살피면 길하고 허물이 없다"],["頻巽 吝","거듭 억지로 따른다. 마음에 없는 굽힘은 부끄럽다"],["悔亡 田獲三品","후회가 없다. 사냥에서 세 가지를 얻는다. 겸손으로 성과를 거둔다"],["貞吉悔亡 无不利 无初有終 先庚三日 後庚三日 吉","바르면 길하고 이롭지 않음이 없다. 처음은 없어도 끝이 있다. 바꾸기 전후로 사흘씩 살피라"],["巽在牀下 喪其資斧 貞凶","침상 아래까지 굽혀 재물과 도끼를 잃는다. 지나친 굽힘은 흉하다"]],"58":[["和兌 吉","화평하게 기뻐하니 길하다"],["孚兌 吉 悔亡","진심으로 기뻐하니 길하고 후회가 없다"],["來兌 凶","와서 아첨하며 기뻐하니 흉하다. 밖에서 즐거움을 구하지 말라"],["商兌未寧 介疾有喜","기쁨을 헤아리며 마음이 편치 않다. 나쁜 것을 가르면 기쁨이 있다"],["孚于剝 有厲","깎아내는 이를 믿으면 위태롭다"],["引兌","이끌려 기뻐한다. 즐거움에 끌려가는 상태"]],"59":[["用拯馬壯 吉","건장한 말로 구해 낸다. 흩어지기 전에 서둘러 도우면 길하다"],["渙奔其机 悔亡","흩어질 때 의지할 책상으로 달려간다. 후회가 사라진다"],["渙其躬 无悔","내 몸의 사심을 흩어 버리니 후회가 없다"],["渙其群 元吉 渙有丘 匪夷所思","작은 무리를 흩어 큰 무리를 이룬다. 크게 길하고 범상치 않은 일이다"],["渙汗其大號 渙王居 无咎","땀을 흘리듯 큰 명령을 내려 흩어진 마음을 모은다. 허물이 없다"],["渙其血 去逖出 无咎","상처와 두려움이 흩어져 멀리 떠난다. 허물이 없다"]],"60":[["不出戶庭 无咎","문과 뜰 밖으로 나가지 않는다. 때를 알고 삼가니 허물이 없다"],["不出門庭 凶","문밖으로 나가야 할 때 나가지 않으니 기회를 놓쳐 흉하다"],["不節若 則嗟若 无咎","절제하지 않아 탄식한다. 스스로 책임지면 허물이 없다"],["安節 亨","편안하게 절제하니 형통하다"],["甘節 吉 往有尚","달게 절제하니 길하다. 나아가면 높이 평가받는다"],["苦節 貞凶 悔亡","괴롭게 절제하니 바르게 해도 흉하다. 후회를 거두라"]],"61":[["虞吉 有它不燕","헤아려 믿으니 길하다. 딴 마음을 품으면 편치 않다"],["鳴鶴在陰 其子和之 我有好爵 吾與爾靡之","그늘에서 우는 학에 새끼가 화답한다. 좋은 술을 함께 나눈다. 진심이 통한다"],["得敵 或鼓或罷 或泣或歌","맞서는 이를 만나 북을 치다 그치고 울다 노래한다. 상대에 휘둘린다"],["月幾望 馬匹亡 无咎","보름달이 가까우니 짝 잃은 말이 떠난다. 허물이 없다"],["有孚攣如 无咎","믿음으로 단단히 이어졌다. 허물이 없다"],["翰音登于天 貞凶","닭 울음이 하늘에 오른다. 실속 없이 소리만 높으니 흉하다"]],"62":[["飛鳥以凶","나는 새가 날다가 흉하다. 분수에 맞지 않게 오르면 화를 부른다"],["過其祖 遇其妣 不及其君 遇其臣 无咎","할아버지를 지나쳐 할머니를 만난다. 군주에 못 미치고 신하를 만난다. 허물이 없다"],["弗過防之 從或戕之 凶","지나치지 않으려 막으나 방비하지 않으면 해를 입어 흉하다"],["无咎 弗過遇之 往厲必戒 勿用永貞","허물이 없다. 지나치지 않게 만나라. 나아가면 위태로우니 경계하고 고집하지 말라"],["密雲不雨 自我西郊 公弋取彼在穴","구름이 빽빽해도 비가 내리지 않는다. 구덩이 속 짐승을 잡는다. 때가 덜 찼다"],["弗遇過之 飛鳥離之 凶 是謂災眚","만나지 못하고 지나친다. 새가 그물에 걸리니 재앙이다"]],"63":[["曳其輪 濡其尾 无咎","수레바퀴를 끌고 꼬리를 적신다. 천천히 가니 허물이 없다"],["婦喪其茀 勿逐 七日得","수레 가리개를 잃어도 쫓지 말라. 이레면 되찾는다"],["高宗伐鬼方 三年克之 小人勿用","고종이 귀방을 삼 년 만에 이긴다. 힘든 일은 소인을 쓰지 말라"],["繻有衣袽 終日戒","배가 새면 해진 옷으로 막는다. 종일 경계하라"],["東鄰殺牛 不如西鄰之禴祭 實受其福","동쪽 이웃의 소 잡는 제사보다 서쪽 이웃의 소박한 제사가 복을 받는다. 정성이 중요하다"],["濡其首 厲","머리를 적신다. 안주하다 물에 빠지니 위태롭다"]],"64":[["濡其尾 吝","꼬리를 적신다. 시작이 서툴러 부끄럽다"],["曳其輪 貞吉","수레바퀴를 끌며 천천히 나아간다. 바르면 길하다"],["未濟 征凶 利涉大川","아직 건너지 못했다. 서둘러 나아가면 흉하나 모두와 함께하면 건너도 이롭다"],["貞吉悔亡 震用伐鬼方 三年有賞于大國","바르면 길하고 후회가 없다. 우레처럼 일어나 애쓰면 보상이 있다"],["貞吉无悔 君子之光 有孚吉","바르면 길하고 후회가 없다. 군자의 빛이 있고 믿음으로 길하다"],["有孚于飲酒 无咎 濡其首 有孚失是","진실하게 마시고 즐기니 허물이 없다. 취해 머리를 적시면 믿음도 도리도 잃는다"]]};
+const TRI_SYM = {"건":"☰","태":"☱","리":"☲","진":"☳","손":"☴","감":"☵","간":"☶","곤":"☷"};
+const KEY = "juyeok_daily_v2", PKEY = "juyeok_prefs_v2";
+const $ = id => document.getElementById(id);
+const MODES = {
+  basic:{label:"기본", desc:"날짜만으로 정해지는 괘 · 누구에게나 같은 날 같은 괘"},
+  plum:{label:"날짜 연결", desc:"매화역수 방식 · 음력 연·월·일과 일진(日辰)으로 상괘·하괘를 계산"},
+  now:{label:"지금 이 순간", desc:"매화역수 시각법 · 뽑는 순간의 음력 날짜와 시(時)로 괘·동효·변괘를 계산 · 뽑는 때마다 달라질 수 있음"},
+  coin:{label:"동전 던지기", desc:"동전 세 닢을 여섯 번 던져 아래 효부터 쌓습니다 · 노음(6)·노양(9)은 변효가 되어 변괘와 효사를 봅니다"},
+  personal:{label:"나만의 괘", desc:"이름과 생년월일을 섞어 사람마다 다른 괘 · 같은 사람은 같은 날 같은 괘"}
+};
+const STEM_H="甲乙丙丁戊己庚辛壬癸", STEM_K="갑을병정무기경신임계";
+const BR_H="子丑寅卯辰巳午未申酉戌亥", BR_K="자축인묘진사오미신유술해";
+const NUM2TRI = {1:"건",2:"태",3:"리",4:"진",5:"손",6:"감",7:"간",8:"곤"};
+
+function pad(n){return String(n).padStart(2,"0")}
+function dateKey(d){return d.getFullYear()+"-"+pad(d.getMonth()+1)+"-"+pad(d.getDate())}
+function korDate(k){
+  const [y,m,d]=k.split("-").map(Number); const w="일월화수목금토"[new Date(y,m-1,d).getDay()];
+  return y+"년 "+m+"월 "+d+"일 "+w+"요일";
+}
+function shortDate(k){const [,m,d]=k.split("-").map(Number);return m+"/"+d}
+function hash(s){let h=2166136261;for(let i=0;i<s.length;i++){h^=s.charCodeAt(i);h=Math.imul(h,16777619)}return h>>>0}
+function byNum(n){return DATA.find(h=>h.number===n)}
+
+// ── 일진(日辰): 60갑자 ──
+function dayGZ(k){
+  const [y,m,d]=k.split("-").map(Number);
+  const jdn = Math.floor(Date.UTC(y,m-1,d)/86400000)+2440588;
+  const idx = ((jdn+49)%60+60)%60;
+  const s=idx%10, b=idx%12;
+  return {s,b,hanja:STEM_H[s]+BR_H[b], kor:STEM_K[s]+BR_K[b]};
+}
+// ── 음력 (브라우저 내장 달력 사용, 실패 시 양력으로 대체) ──
+function lunar(k){
+  const [y,m,d]=k.split("-").map(Number);
+  try{
+    const parts=new Intl.DateTimeFormat("en-u-ca-chinese",{timeZone:"UTC",year:"numeric",month:"numeric",day:"numeric"})
+      .formatToParts(new Date(Date.UTC(y,m-1,d,12)));
+    const g=t=>(parts.find(p=>p.type===t)||{}).value;
+    const ry=parseInt(g("relatedYear")), lm=parseInt(g("month")), ld=parseInt(g("day"));
+    if(ry&&lm&&ld) return {y:ry,m:lm,d:ld,leap:/bis/i.test(g("month")),ok:true};
+  }catch(e){}
+  return {y,m,d,leap:false,ok:false};
+}
+
+function pickFor(k, mode, prefs){
+  if(mode==="plum"){
+    const L=lunar(k), gz=dayGZ(k);
+    const yb=((L.y-4)%12+12)%12+1;           // 연지수 子=1 … 亥=12
+    const db=gz.b+1;                          // 일지수 子=1 … 亥=12
+    const sum=yb+L.m+L.d;
+    const up=(sum%8)||8, lo=((sum+db)%8)||8;
+    const h=DATA.find(x=>x.upper_trigram.key===NUM2TRI[up]&&x.lower_trigram.key===NUM2TRI[lo]);
+    const basis=(L.ok?"음력 "+(L.leap?"윤":"")+L.m+"월 "+L.d+"일":"양력 "+L.m+"월 "+L.d+"일")+" · "+gz.kor+"("+gz.hanja+")일 → 상괘 "+NUM2TRI[up]+" · 하괘 "+NUM2TRI[lo];
+    return {h,basis};
+  }
+  if(mode==="personal"){
+    const h=DATA[hash("juyeok|"+prefs.name.trim()+"|"+prefs.birth+"|"+k)%DATA.length];
+    return {h,basis:prefs.name.trim()+"님의 오늘 괘"};
+  }
+  return {h:DATA[hash("juyeok|"+k)%DATA.length],basis:""};
+}
+
+function numOf(e){return (e&&typeof e==="object")?e.n:e}
+function pickNow(){
+  const now=new Date(), k=dateKey(now), L=lunar(k);
+  const yb=((L.y-4)%12+12)%12+1;
+  const hb=Math.floor((now.getHours()+1)/2)%12;      // 子時=0 (23~01시)
+  const sum=yb+L.m+L.d, t=sum+hb+1;
+  const up=(sum%8)||8, lo=(t%8)||8, mv=(t%6)||6;
+  const h=DATA.find(x=>x.upper_trigram.key===NUM2TRI[up]&&x.lower_trigram.key===NUM2TRI[lo]);
+  const pt=h.line_pattern_bottom_to_top;
+  const flipped=pt.slice(0,mv-1)+(pt[mv-1]==="1"?"0":"1")+pt.slice(mv);
+  const to=DATA.find(x=>x.line_pattern_bottom_to_top===flipped);
+  const hhmm=pad(now.getHours())+":"+pad(now.getMinutes());
+  const basis=hhmm+" "+BR_K[hb]+"시("+BR_H[hb]+"時) · "+(L.ok?"음력 "+(L.leap?"윤":"")+L.m+"월 "+L.d+"일":"양력 "+L.m+"월 "+L.d+"일")+
+    " → 상괘 "+NUM2TRI[up]+" · 하괘 "+NUM2TRI[lo]+" · 동효 "+mv+"효(붉은 줄) → 변괘 "+to.korean_name+"("+to.hanja+")";
+  return {h,mvs:[mv],basis};
+}
+function load(){try{return JSON.parse(localStorage.getItem(KEY))||{}}catch(e){return {}}}
+function save(o){try{localStorage.setItem(KEY,JSON.stringify(o))}catch(e){}}
+function loadP(){try{return Object.assign({mode:"basic",name:"",birth:""},JSON.parse(localStorage.getItem(PKEY))||{})}catch(e){return {mode:"basic",name:"",birth:""}}}
+function saveP(o){try{localStorage.setItem(PKEY,JSON.stringify(o))}catch(e){}}
+
+const todayKey = dateKey(new Date());
+let log = load(), prefs = loadP(), viewKey = todayKey;
+if(!MODES[prefs.mode]) prefs.mode="basic";
+
+function hexHTML(p,mv){
+  const yao = i => '<div class="yao '+(p[i]==="1"?"yang":"yin")+((mv||[]).includes(i+1)?" mv":"")+'"><i></i>'+(p[i]==="1"?"":"<i></i>")+'</div>';
+  const up = [5,4,3].map(yao).join(""), lo = [2,1,0].map(yao).join("");
+  return '<div class="hex" aria-hidden="true"><div class="grp">'+up+'</div><div class="grp">'+lo+'</div></div>';
+}
+const POS=["초효","이효","삼효","사효","오효","상효"], POS_SHORT=["초","이","삼","사","오","상"];
+const VNAME={6:"노음 ×",7:"소양",8:"소음",9:"노양 ○"};
+function yaoLabel(p,i){const yang=p[i]==="1";return i===0?(yang?"초구":"초육"):i===5?(yang?"상구":"상육"):((yang?"구":"육")+POS_SHORT[i]);}
+function yaoItem(label,orig,txt,hl){return '<div class="yi'+(hl?' hl':'')+'"><b>'+label+'</b><span class="ho">'+orig+'</span><p>'+txt+'</p></div>'}
+function changedHex(h,mvs){const a=h.line_pattern_bottom_to_top.split("");mvs.forEach(m=>a[m-1]=a[m-1]==="1"?"0":"1");const q=a.join("");return DATA.find(x=>x.line_pattern_bottom_to_top===q)}
+function yaoHTML(h,mvs,showMv){
+  const ys=YAO[h.number], p=h.line_pattern_bottom_to_top, extra=h.number===1?"용구(用九)":"용육(用六)";
+  let s="";
+  if(showMv){
+    if(mvs.length){
+      s+='<div class="sec"><h3>변효 풀이 · '+mvs.length+'개</h3>'+mvs.map(m=>yaoItem(yaoLabel(p,m-1),ys[m-1][0],ys[m-1][1],true)).join("");
+      if(mvs.length===6&&ys[6]) s+=yaoItem(extra,ys[6][0],ys[6][1],true);
+      s+='</div>';
+      const to=changedHex(h,mvs);
+      s+='<div class="sec"><h3>변괘 · 이어지는 흐름</h3><p><b>제 '+to.number+'괘 '+to.korean_name+' ('+to.hanja+')</b><br>'+to.core_meaning+'</p></div>';
+    } else s+='<div class="sec"><h3>변효</h3><p>변하는 효가 없습니다. 괘 전체의 뜻을 중심으로 읽어 보세요.</p></div>';
+  }
+  s+='<details class="all"><summary>여섯 효 전체 보기</summary>'+
+    [5,4,3,2,1,0].map(i=>yaoItem(yaoLabel(p,i)+' ('+POS[i]+')',ys[i][0],ys[i][1],mvs.includes(i+1))).join("")+
+    (ys[6]?yaoItem(extra,ys[6][0],ys[6][1],false):"")+'</details>';
+  return s;
+}
+function cardHTML(h,basis,mvs,showMv){
+  mvs=mvs||[];
+  const u=h.upper_trigram, l=h.lower_trigram;
+  return '<article class="card">'+
+   '<div class="top">'+hexHTML(h.line_pattern_bottom_to_top,mvs)+
+     '<div class="names"><div class="num">제 '+h.number+' 괘</div>'+
+     '<p class="hanja">'+h.hanja+'</p><div class="kname">'+h.korean_name+'</div></div></div>'+
+   '<div class="trig"><span><b>'+TRI_SYM[u.key]+'</b>위 · '+u.meaning+' ('+u.hanja+')</span>'+
+   '<span><b>'+TRI_SYM[l.key]+'</b>아래 · '+l.meaning+' ('+l.hanja+')</span></div>'+
+   '<div class="core">'+h.core_meaning+'</div>'+
+   '<div class="sec"><h3>스스로에게 묻기</h3><p>'+h.reflection_question+'</p></div>'+
+   '<div class="sec"><h3>오늘의 한 걸음</h3><p>'+h.practical_advice+'</p></div>'+
+   yaoHTML(h,mvs,showMv)+
+   (basis?'<div class="basis">'+basis+'</div>':'')+
+   '<div class="actions"><button class="btn" data-act="copy">복사하기</button>'+
+   (navigator.share?'<button class="btn" data-act="share">공유하기</button>':'')+'</div>'+
+  '</article>';
+}
+function closedHTML(){
+  return '<button class="deck" id="deck" aria-label="오늘의 괘 뽑기"><div class="back" id="back">'+
+    '<div class="tai">☯</div><div class="hint">카드를 눌러 오늘의 괘를 뽑으세요</div>'+
+    '<div class="sub">마음을 가라앉히고 한 번 누릅니다</div></div></button>';
+}
+function textOf(h,k,mvs){
+  let t="["+korDate(k)+"] 오늘의 주역 · 제"+h.number+"괘 "+h.hanja+" "+h.korean_name+"\n"+
+   "▶ "+h.core_meaning+"\n"+"Q. "+h.reflection_question+"\n"+"→ "+h.practical_advice;
+  if(mvs&&mvs.length){const p=h.line_pattern_bottom_to_top, to=changedHex(h,mvs);
+    t+="\n변효: "+mvs.map(m=>yaoLabel(p,m-1)).join(", ")+" → 변괘 "+to.korean_name+"("+to.hanja+")";
+    mvs.forEach(m=>{t+="\n· "+yaoLabel(p,m-1)+" "+YAO[h.number][m-1][0]+" — "+YAO[h.number][m-1][1]});}
+  return t;
+}
+function toast(msg){const t=$("toast");t.textContent=msg;t.classList.add("on");setTimeout(()=>t.classList.remove("on"),1600)}
+function personalReady(){return prefs.name.trim().length>0 && !!prefs.birth}
+function toTop(){window.scrollTo({top:0,behavior:"smooth"})}
+
+let coinLines=[], lastCoins=null;
+function rnd3(){const a=new Uint8Array(3);if(window.crypto&&crypto.getRandomValues)crypto.getRandomValues(a);else for(let i=0;i<3;i++)a[i]=Math.random()*256|0;return [...a].map(x=>x&1)}
+function coinTrayHTML(){
+  const n=coinLines.length;
+  const slots=[5,4,3,2,1,0].map(i=>{
+    const v=coinLines[i];
+    if(!v) return '<div class="slot"><span class="sl">'+POS[i]+'</span><div class="yao"><i style="width:100%;opacity:.13"></i></div><span class="sv"></span></div>';
+    const yang=v===7||v===9, ch=v===6||v===9;
+    return '<div class="slot"><span class="sl">'+POS[i]+'</span><div class="yao '+(yang?"yang":"yin")+(ch?" mv":"")+'"><i></i>'+(yang?"":"<i></i>")+'</div><span class="sv">'+VNAME[v]+'</span></div>';
+  }).join("");
+  const coins=[0,1,2].map(i=>lastCoins?('<div class="coin '+(lastCoins[i]?'':'tails')+'">'+(lastCoins[i]?'앞':'뒤')+'</div>'):'<div class="coin">?</div>').join("");
+  return '<div class="tray"><div class="tq">마음속 질문을 떠올리고<br>동전을 여섯 번 던집니다<br><small>앞면 3 · 뒷면 2 — 세 닢의 합으로 한 효가 정해집니다</small></div>'+
+    '<div class="slots">'+slots+'</div><div class="coins" id="coins">'+coins+'</div>'+
+    '<button class="btn gold" id="throw">'+POS[n]+' 던지기 ('+n+'/6)</button></div>';
+}
+function finishCoin(){
+  const pat=coinLines.map(v=>(v===7||v===9)?"1":"0").join("");
+  const h=DATA.find(x=>x.line_pattern_bottom_to_top===pat);
+  const mvs=coinLines.map((v,i)=>(v===6||v===9)?i+1:0).filter(Boolean);
+  const basis="던진 값(초효→상효) "+coinLines.join("·")+(mvs.length?" · 변효 "+mvs.length+"개(붉은 줄)":" · 변효 없음");
+  log[todayKey]=Object.assign(log[todayKey]||{},{coin:{n:h.number,mvs,basis,lines:coinLines.slice()}}); save(log);
+  coinLines=[]; lastCoins=null; render(); toTop();
+}
+function renderModes(){
+  $("modes").innerHTML = Object.keys(MODES).map(m=>'<button data-m="'+m+'" aria-pressed="'+(m===prefs.mode)+'">'+MODES[m].label+'</button>').join("");
+  $("modes").querySelectorAll("button").forEach(b=>b.onclick=()=>{prefs.mode=b.dataset.m;saveP(prefs);viewKey=todayKey;renderModes();render()});
+  $("mdesc").textContent = MODES[prefs.mode].desc;
+  $("pbox").hidden = prefs.mode!=="personal";
+  $("pname").value = prefs.name; $("pbirth").value = prefs.birth;
+}
+
+function render(){
+  $("date").textContent = korDate(todayKey);
+  const stage=$("stage"), mode=prefs.mode;
+  const mine = k => (log[k]||{})[mode];
+  const needProfile = mode==="personal" && !personalReady();
+
+  if(needProfile){
+    stage.innerHTML='<div class="need">이름(또는 별칭)과 생년월일을 위에 입력하면<br>나만의 오늘 괘를 뽑을 수 있습니다.</div>';
+  } else if(mode==="coin" && viewKey===todayKey && !mine(todayKey)){
+    stage.innerHTML = coinTrayHTML();
+    $("throw").onclick=()=>{
+      const bits=rnd3(), v=bits.reduce((t,b)=>t+(b?3:2),0);
+      document.querySelectorAll("#coins .coin").forEach(c=>c.classList.add("spin"));
+      $("throw").disabled=true;
+      setTimeout(()=>{ lastCoins=bits; coinLines.push(v); if(coinLines.length<6) render(); else finishCoin(); },650);
+    };
+  } else if(viewKey===todayKey && !mine(todayKey)){
+    stage.innerHTML = closedHTML();
+    $("deck").onclick = () => {
+      $("back").classList.add("shake");
+      setTimeout(()=>{
+        const r = mode==="now" ? pickNow() : pickFor(todayKey,mode,prefs);
+        const val = mode==="now" ? {n:r.h.number,mvs:r.mvs,basis:r.basis} : r.h.number;
+        log[todayKey]=Object.assign(log[todayKey]||{}, {[mode]:val}); save(log);
+        render(); toTop();
+      }, 950);
+    };
+  } else {
+    const e = mine(viewKey);
+    const h = byNum(numOf(e));
+    // 기록 보기 때도 기준 문구는 같은 방식으로 다시 계산
+    const isObj = e && typeof e==="object";
+    const basis = isObj ? e.basis : pickFor(viewKey,mode,prefs).basis;
+    const mvs = isObj ? (e.mvs || (e.mv?[e.mv]:[])) : [];
+    const showMv = mode==="now" || mode==="coin";
+    let pre = "";
+    if(viewKey!==todayKey) pre = '<p class="viewing">'+korDate(viewKey)+'의 괘<a id="backToday">오늘로 돌아가기</a></p>';
+    stage.innerHTML = pre + cardHTML(h,basis,mvs,showMv);
+    const b=$("backToday"); if(b) b.onclick=()=>{viewKey=todayKey;render();toTop()};
+    stage.querySelector('[data-act="copy"]').onclick = async () => {
+      const t=textOf(h,viewKey,mvs);
+      try{await navigator.clipboard.writeText(t);toast("복사했습니다")}
+      catch(e){const ta=document.createElement("textarea");ta.value=t;document.body.appendChild(ta);ta.select();
+        try{document.execCommand("copy");toast("복사했습니다")}catch(_){toast("복사에 실패했습니다")}ta.remove()}
+    };
+    if(showMv && viewKey===todayKey){
+      stage.querySelector(".actions").insertAdjacentHTML("beforeend",'<button class="btn" data-act="redraw">'+(mode==="coin"?"다시 던지기":"지금 다시 뽑기")+'</button>');
+      stage.querySelector('[data-act="redraw"]').onclick=()=>{ delete log[todayKey][mode]; save(log); coinLines=[]; lastCoins=null; render(); toTop(); };
+    }
+    const s=stage.querySelector('[data-act="share"]');
+    if(s) s.onclick=()=>navigator.share({text:textOf(h,viewKey,mvs)}).catch(()=>{});
+  }
+
+  const keys = Object.keys(log).filter(k=>k!==todayKey && log[k][mode]).sort().reverse().slice(0,10);
+  $("hist").hidden = keys.length===0 || needProfile;
+  $("histList").innerHTML = keys.map(k=>{const h=byNum(numOf(log[k][mode]));
+    return '<li><button data-k="'+k+'"><span class="d">'+shortDate(k)+'</span><span class="h">'+h.hanja+'</span><span class="n">'+h.korean_name+' · '+h.core_meaning.split(",")[0]+'</span></button></li>'}).join("");
+  $("histList").querySelectorAll("button").forEach(b=>b.onclick=()=>{viewKey=b.dataset.k;render();toTop()});
+}
+
+["pname","pbirth"].forEach(id=>$(id).addEventListener("input",()=>{
+  prefs.name=$("pname").value; prefs.birth=$("pbirth").value; saveP(prefs); render();
+}));
+renderModes(); render();
+</script>
+</body>
+</html>
