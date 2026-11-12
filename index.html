@@ -223,9 +223,28 @@ function sixtyLine(k,when){ // k: 날짜키, when: 기준 시각(없으면 그�
   const H=p=>STEM_H[p.s]+BR_H[p.b], K=p=>STEM_K[p.s]+BR_K[p.b];
   return {hanja:H(ym.y)+"年 "+H(ym.m)+"月 "+dg.hanja+"日", kor:K(ym.y)+"년 · "+K(ym.m)+"월 · "+dg.kor+"일"};
 }
-// ── 음력 (브라우저 내장 달력 사용, 실패 시 양력으로 대체) ──
+// ── 음력: 1900~2050은 한국천문연구원 기준 음력표, 그 밖은 브라우저 내장 달력 ──
+const LUNAR_KR="30.8.96d,49.0.4ae,38.0.a57,28.5.a4d,46.0.d26,34.0.d95,24.4.d55,43.0.56a,32.0.9ad,21.2.95d,40.0.4ae,29.6.149b,48.0.a4d,36.0.d25,25.5.1b29,44.0.b55,34.0.56a,22.2.12da,41.0.95d,31.7.95b,50.0.49b,38.0.a4b,27.5.164b,46.0.6a9,35.0.ad4,23.4.16b5,43.0.2b6,32.0.95b,22.2.937,40.0.497,29.6.c96,47.0.e4a,36.0.ea5,25.5.da9,44.0.5b5,34.0.2b6,23.3.12ae,41.0.92e,30.7.192d,49.0.c95,38.0.d4a,26.6.1b4a,45.0.b69,35.0.56d,25.4.55b,43.0.25d,32.0.92d,21.2.192b,40.0.a95,28.7.1a95,47.0.b4a,36.0.b55,26.5.ad5,44.0.4db,34.0.25b,23.3.1257,42.0.52b,30.8.152b,49.0.695,38.0.6aa,27.6.15aa,45.0.ab5,35.0.4b6,24.4.14ae,43.0.a57,32.0.527,21.3.d26,39.0.d95,29.7.d55,47.0.56a,36.0.9ad,26.5.95d,45.0.4ae,33.0.a4e,22.4.1a4d,41.0.d25,30.8.1aa9,48.0.b54,37.0.d6a,27.6.12da,46.0.95b,35.0.49b,24.4.149b,43.0.a4b,32.10.164b,50.0.6a5,39.0.6d4,28.6.16b5,48.0.2b6,36.0.95b,26.5.937,45.0.497,34.0.64b,22.3.d4a,40.0.ea5,30.8.da9,49.0.5ad,38.0.2b6,27.5.126e,46.0.92e,35.0.c96,23.4.1c95,42.0.d4a,31.0.da5,21.2.b55,39.0.56c,28.7.155b,48.0.25d,37.0.92d,25.5.192b,44.0.a95,33.0.b4a,22.3.174a,40.0.b55,30.9.ab5,49.0.4ba,38.0.a5b,27.5.a57,46.0.52b,35.0.a95,24.4.1695,42.0.6aa,31.0.ad5,21.2.ab5,40.0.4b6,28.6.14ae,47.0.a57,37.0.527,26.5.d26,43.0.d93,33.0.5aa,22.3.156a,41.0.96d,30.11.95d,49.0.4ae,38.0.a4d,27.6.1a4d,45.0.d25,34.0.d52,23.5.1b54,42.0.b6a,31.0.96d,21.2.95b,40.0.49b,29.7.1497,47.0.a4b,36.0.b25,25.5.16a5,44.0.6d4,32.0.ada,22.3.12b4".split(",");
+function lunarKR(y,m,d){
+  const t=Date.UTC(y,m-1,d);
+  for(const ly of [y,y-1]){
+    if(ly<1900||ly>2050) continue;
+    const a=LUNAR_KR[ly-1900].split("."), off=+a[0], lp=+a[1], n=lp?13:12, bits=parseInt(a[2],16).toString(2).padStart(n,"0");
+    let day=Math.round((t-Date.UTC(ly,0,1))/864e5)-off; // 그해 음력 1월 1일부터 지난 날 수
+    if(day<0) continue;
+    let idx=0;
+    for(let mm=1;mm<=12;mm++){
+      const len=bits[idx++]==="1"?30:29;
+      if(day<len) return {y:ly,m:mm,d:day+1,leap:false,ok:true};
+      day-=len;
+      if(lp===mm){const ll=bits[idx++]==="1"?30:29; if(day<ll) return {y:ly,m:mm,d:day+1,leap:true,ok:true}; day-=ll;}
+    }
+  }
+  return null;
+}
 function lunar(k){
   const [y,m,d]=k.split("-").map(Number);
+  const kr=lunarKR(y,m,d); if(kr) return kr;
   try{
     const parts=new Intl.DateTimeFormat("en-u-ca-chinese",{timeZone:"UTC",year:"numeric",month:"numeric",day:"numeric"})
       .formatToParts(new Date(Date.UTC(y,m-1,d,12)));
@@ -235,6 +254,7 @@ function lunar(k){
   }catch(e){}
   return {y,m,d,leap:false,ok:false};
 }
+function lunarText(k){const L=lunar(k);return L.ok?"음력 "+(L.leap?"윤":"")+L.m+"월 "+L.d+"일":"";}
 
 function pickFor(k, mode, prefs){
   if(mode==="plum"){
@@ -330,7 +350,7 @@ function closedHTML(){
     '<div class="sub">마음을 가라앉히고 한 번 누릅니다</div></div></button>';
 }
 function textOf(h,k,mvs){
-  let t="["+korDate(k)+" · "+sixtyLine(k,k===todayKey?new Date():null).kor.replace(/ · /g," ")+"] 오늘의 주역 · 제"+h.number+"괘 "+h.hanja+" "+h.korean_name+"\n"+
+  let t="["+korDate(k)+(lunarText(k)?" ("+lunarText(k)+")":"")+" · "+sixtyLine(k,k===todayKey?new Date():null).kor.replace(/ · /g," ")+"] 오늘의 주역 · 제"+h.number+"괘 "+h.hanja+" "+h.korean_name+"\n"+
    "▶ "+h.core_meaning+"\n"+"Q. "+h.reflection_question+"\n"+"→ "+h.practical_advice;
   if(mvs&&mvs.length){const p=h.line_pattern_bottom_to_top, to=changedHex(h,mvs);
     t+="\n변효: "+mvs.map(m=>yaoLabel(p,m-1)).join(", ")+" → 변괘 "+to.korean_name+"("+to.hanja+")";
@@ -376,7 +396,7 @@ function renderModes(){
 
 function render(){
   $("date").textContent = korDate(todayKey);
-  { const L=sixtyLine(todayKey,new Date()); $("gz6").innerHTML=L.hanja+"<small>"+L.kor+" (일진)</small>"; }
+  { const L=sixtyLine(todayKey,new Date()); $("gz6").innerHTML=L.hanja+"<small>"+L.kor+" (일진)</small>"; const lt=lunarText(todayKey); if(lt) $("date").textContent=korDate(todayKey)+" · "+lt; }
   const stage=$("stage"), mode=prefs.mode;
   const mine = k => (log[k]||{})[mode];
   const needProfile = mode==="personal" && !personalReady();
